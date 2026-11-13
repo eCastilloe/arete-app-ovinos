@@ -1,0 +1,23 @@
+# Python / API
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.pytest_cache/
+
+# Android
+.gradle/
+local.properties
+.idea/
+*.iml
+build/
+captures/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Sistema
+.DS_Store
+Thumbs.db
