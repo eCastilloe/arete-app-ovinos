@@ -1,4 +1,4 @@
-# Aplicación Ovina (Nombre pendiente)
+# Arete
 
 - `api/` — Backend FastAPI (Render + Neon)
 - `android/` — App Android (Kotlin, MVVM)
