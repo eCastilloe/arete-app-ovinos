@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
             AreteTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Greeting(
-                        name = BuildConfig.API_BASE_URL,
+                        name = "Android",
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
