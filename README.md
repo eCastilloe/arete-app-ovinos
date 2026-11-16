@@ -164,7 +164,7 @@ fun InventoryScreen(
 2. Commits con el prefijo de la historia: `HU-XX: mensaje`
 3. Sube tu rama (`git push`) seguido; es tu respaldo.
 4. Abre un Pull Request hacia `main` y llena el checklist de la plantilla (Definition of Done).
-5. Se fusiona solo con **1 aprobación** (Felipan o Emmanuel). Nadie sube directo a `main`.
+5. Se fusiona solo con **1 aprobación** (Felipe o Emmanuel). Nadie sube directo a `main`.
 6. Mueve la tarjeta a "Hecho" en Trello con el enlace al PR.
 
 Tablero: https://trello.com/b/KVDt8V4n/aplicacion-ovina
