@@ -10,10 +10,20 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import androidx.room.Room
+import com.arete.app.data.local.AppDatabase
 
 class AppContainer(context: Context) {
 
     val tokenStorage = TokenStorage(context)
+
+    val database: AppDatabase = Room.databaseBuilder(
+        context.applicationContext,
+        AppDatabase::class.java,
+        "arete.db"
+    )
+        .fallbackToDestructiveMigration(dropAllTables = true)
+        .build()
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = if (BuildConfig.DEBUG) {
