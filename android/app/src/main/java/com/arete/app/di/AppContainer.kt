@@ -12,6 +12,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 import androidx.room.Room
 import com.arete.app.data.local.AppDatabase
+import com.arete.app.data.repository.AuthRepository
+import com.arete.app.data.repository.SyncRepository
 
 class AppContainer(context: Context) {
 
@@ -47,4 +49,7 @@ class AppContainer(context: Context) {
         .addConverterFactory(GsonConverterFactory.create())
         .build()
         .create(ApiService::class.java)
+
+    val authRepository = AuthRepository(apiService, tokenStorage)
+    val syncRepository = SyncRepository(database.pendingOperationDao())
 }
