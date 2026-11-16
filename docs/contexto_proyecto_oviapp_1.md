@@ -1,0 +1,268 @@
+# Contexto del Proyecto: AgroTech / Arete — Gestión ovina para ranchos pequeños y medianos
+
+> Documento de contexto para Claude. Úsalo como referencia base para cualquier tarea del proyecto (backlog, código, diagramas, documentación, presentaciones).
+> Leyenda: **[CONFIRMADO]** = dicho por los productores/especialistas/docentes · **[PROPUESTO]** = decisión técnica del equipo aún no validada.
+
+---
+
+## 1. Resumen
+
+- **Qué es:** app móvil Android (mobile-first) + panel web + backend en la nube para gestionar la información productiva, reproductiva, sanitaria y económica de ranchos **ovinos** (solo ovejas, nada de bovinos).
+- **Para quién:** pequeños y medianos productores de México (10 a 1,000 cabezas; típico: ~50 borregas en ranchos chicos, 250–300 en medianos). Hay ~1 millón de pequeños productores que no pueden pagar software caro.
+- **Problema:** los productores no saben si su rancho es rentable ni detectan "vientres improductivos". Hoy capturan en libretas, pizarrones o Excel ("Sábana"). La alternativa existente, **OvisWebs (PECOSA, Colombia)**, cobra licencias en dólares, no tiene app móvil y su interfaz es compleja para productores mayores.
+- **Modelo de negocio:** **por definir** en una versión posterior. La suscripción se mencionó solo como ejemplo; no es un requisito del prototipo.
+- **Presupuesto del equipo:** **sin pagar servicios** (BD, hosting y nube en planes gratuitos o de estudiante). Se permiten gastos pequeños de hardware para la demo, como stickers NFC, y se pedirá prestado un Android con NFC.
+- **Visión:** no debe ser un "elefante blanco". Se escalará de Jalisco a todo México y después a Centroamérica. **El equipo ganador tendrá trabajo continuo para mantener el proyecto.**
+- **Nombre del producto:** **Arete** (decidido el 12 nov 2026; antes se llamaba "OviApp" como nombre de trabajo). El arete es la identidad del animal y conecta con la función de acercar el celular al arete (NFC/QR).
+
+## 2. Contexto académico
+
+- **Proyecto final integrador** (UAG) para dos materias:
+  - **Ingeniería en Desarrollo de Software 2:** rol de Project Manager / Scrum Master, backlog y gestión.
+  - **Cómputo en la nube:** el sistema debe estar alojado en la nube.
+- **Entrega:** prototipo funcional en ~3 semanas (aprox. primera semana de diciembre de 2026).
+- **Restricciones de los docentes [CONFIRMADO]:** usar tecnologías que dominan los alumnos (Python, BD relacional tipo SQL Server, POO) **sin costos extra** de hosting, nube de pago ni certificados SSL comerciales. Hay que usar planes gratuitos o de estudiante.
+- **Asesores:** 6 alumnos avanzados de Ingeniería Agropecuaria, asignados por el Mtro. Manuel Alejandro Meléndez Aldana.
+
+## 3. Stakeholders
+
+| Persona | Rol | Aportación |
+|---|---|---|
+| Dr. Uriel | Productor, representante de la asociación AGLOT | Visión de negocio, Sábana de Excel, diseño de módulos, reglas anti-fraude |
+| Alejandro | Presidente Nacional de la Raza Pelifolk | Contexto gremial nacional |
+| Mtro. Manuel Alejandro Meléndez Aldana | Director de Ing. Agropecuaria (UAG) | Excel *Proyección de la Producción Ovina* (fórmulas e indicadores) |
+| MVZ Álvaro Ramírez Leal | Especialista en producción ovina, técnico de registro | Certificados genealógicos, parámetros nutricionales, demo de OvisWebs, propuesta de MVP |
+| Docentes (Iliana Casillas, Gabriela Medina, Jairo Rendón, etc.) | Coordinación académica | Alcance y restricciones técnicas |
+
+## 4. Equipo de desarrollo
+
+- **Felipan (Luis Felipe Ramírez Torres)**, 5.º semestre de Ing. de Software: PM / Scrum Master. **[PROPUESTO]** También desarrolla backend, BD y despliegue en la nube.
+- **Emmanuel Castillo**, 5.º semestre de Ing. de Software: PM / Scrum Master (comparte la gestión con Felipan). **[PROPUESTO]** Desarrolla la app Android (arquitectura, offline, sincronización, NFC).
+- **2 alumnos de 3.º semestre de Ing. de Software:** pantallas de la app (ficha/inventario, nacimientos/pesos).
+- **1 alumno de 3.º semestre de Inteligencia Artificial:** indicadores, cálculos de rentabilidad y exportación a Excel.
+- Formalmente, Felipan y Emmanuel solo gestionan. En la práctica también programan para asegurar la calidad. El código de los de 3.º se revisa con Pull Requests en GitHub.
+- **Nadie tiene Android:** se desarrollará con emulador. Hay que conseguir un Android físico prestado para la demo de NFC.
+
+## 5. Roles de usuario [CONFIRMADO]
+
+| Rol | Dispositivo | Alcance y permisos |
+|---|---|---|
+| **Productor / Dueño** (cuenta matriz) | App móvil + web | Solo **su rancho**. Da de alta animales, pesajes, vacunas, dietas y precios. **No puede editar ni borrar nacimientos** una vez guardados o cerrado el mes. |
+| **Encargado / Trabajador** (cuenta rama) | App móvil | Vinculado al rancho del dueño, con los permisos que el dueño le dé (lectura, captura, edición, exportación). Sus datos se sincronizan con el dueño. Posible cobro escalonado por número de ramas. |
+| **Asociación / Técnico / Veterinario** (superusuario) | Web (computadora) + app | Acceso al **100% de los ranchos afiliados**, con selector de "rancho activo". **Único rol que puede corregir nacimientos**, con evidencia fotográfica. Recibe y descarga las Sábanas en .xlsx. |
+
+- Pendiente: ¿el técnico/veterinario es un cuarto rol independiente o un permiso ligado a una asociación? El veterinario puede atender **varios ranchos** (p. ej. 4 ranchos comparten veterinario) o **uno solo**.
+- Los permisos se validan **en el servidor** en cada petición, sin confiar en el "rancho activo" de la interfaz. Los datos de cada rancho quedan aislados de los demás.
+
+## 6. Reglas de negocio clave
+
+### 6.1 Anti-fraude en nacimientos [CONFIRMADO]
+Algunos productores reportan más crías de las reales (compran corderos externos y los hacen pasar como propios para pedir aretes/chips oficiales a los 5 meses). Por eso:
+1. Se registra cada parto: qué borrega parió y cuántas crías (con datos de cada cría).
+2. Se adjunta **foto de las crías con la madre** como evidencia.
+3. Hay una **ventana de 30 días (cierre de mes)**. Ejemplo: el 1 de octubre ya no se pueden registrar partos de septiembre; para eso hay que pedir el alta a la Asociación con foto.
+4. Una vez guardado y cerrado el periodo, **el productor no puede editar** el número de crías ni los datos del parto.
+5. **Corrección por "error de dedo":** solo la Asociación o el Técnico desbloquean el registro, con evidencia fotográfica. Las correcciones quedan **auditadas** (el original no se sobrescribe; se guardan motivo, evidencia, quién aprobó y fecha).
+6. **Conciliación con mortalidad:** si nacieron 6 y murieron 2, es válido pedir solo 4 chips SINIIGA.
+
+### 6.2 Historial
+- **Los animales muertos o vendidos nunca se borran** de la BD (borrado lógico). Se sacan del inventario vivo, pero se conservan para estadísticas de mortalidad y para evaluar a las madres.
+- **Evaluación materna:** si una borrega pierde sus crías en partos repetidos, se alerta para descartarla (rastro/desecho).
+
+### 6.3 Identificadores (usar ID interno inmutable en BD)
+- **Folio / arete interno** del rancho (ej. `79`, `AIR-2253-H`). Puede repetirse entre ranchos.
+- **Chip SINIIGA** oficial (gobierno/SADER, arete amarillo, prefijo de país `484`, 10–15 dígitos).
+- **Folio de Registro UNO** genealógico (ej. `268309MM-RP`).
+- Certificado físico: **hoja rosa = hembras, azul = machos**. Se replica en la UI, siempre acompañado de texto o icono.
+
+### 6.4 Estados (dimensiones independientes, no un solo enum)
+- Sexo: hembra / macho.
+- Categoría: vientre (hembra reproductora), semental, cría (cordero lactante, cordero en engorda, cordera en recría).
+- Estado reproductivo de hembras: vacía/mantenimiento, en empadre, gestante, en lactancia.
+- Destino de machos: semental (pie de cría) o engorda/rastro.
+- Sanidad: sana, en cuarentena / en tratamiento.
+- Situación: activo, vendido, muerto, desecho.
+
+## 7. Módulos funcionales
+
+### Módulo 1 — Inventario y ficha individual ("acta de nacimiento" del animal)
+- Tres apartados: **Hembras (vientres)**, **Sementales**, **Crías**.
+- Ficha: identificación (folio, SINIIGA, registro, rancho, raza, color, sexo, criador y propietario actual), motivo de ingreso (nacimiento, compra, reingreso, transferencia), fecha de nacimiento, edad automática en meses y días, padre y madre (selectores que filtran animales del rancho; se permiten progenitores externos o desconocidos), tipo de parto (simple, gemelar, triple, cuádruple, quíntuple), método de concepción (MN, IA, TE), foto, campeonatos/exposiciones, historial reproductivo y de partos, y circunferencia testicular (machos).
+- **Navegación bidireccional:** madre ↔ crías ↔ semental, y árbol genealógico de 3 a 4 generaciones.
+
+### Módulo 2 — Pesos, lactancia y destete
+- Pesos al nacimiento, al destete (60–75 días), a los 120 días, a los 150 días y a la evaluación. **Ganancia diaria de peso** automática.
+- **Alerta de destete a los 75 días** (parámetro configurable: 60/75/90). Al confirmar el destete, la madre pasa de Lactancia a Mantenimiento, su dieta cambia de fórmula y se registran el peso al destete y el destino de la cría (engorda, venta, recría/reemplazo).
+
+### Módulo 3 — Reproducción y alerta de parto próximo (RF-21, agregado por el equipo)
+- Se registra el evento reproductivo: método (MN/IA/TE), semental, fecha o rango de empadre y confirmación de preñez.
+- **Fecha probable de parto = fecha de monta + `DGest` (150 días)**, mostrada como ventana de ±2 días (148–152).
+- Con monta natural en grupo, la ventana va de *inicio del empadre + 148* a *fin del empadre + 152*. Se ajusta si se confirma la preñez.
+- Notificaciones: 7 días antes (mover al corral de parto), al inicio de la ventana, y al terminar la ventana sin parto registrado (revisar o avisar al veterinario). Se cancelan al registrar el parto.
+- Notificaciones **locales en el dispositivo** para que funcionen sin internet. Vista para la Asociación: "partos esperados esta semana".
+
+### Módulo 4 — Sanidad, corrales y cuarentena
+- Cartilla por animal o lote: **vacunación, vitaminación, selenio, desparasitación** (fecha, producto, dosis y responsable).
+- Ubicación por **corral**. Área de **cuarentena/enfermería** dentro del rancho, con estado "en tratamiento", diagnóstico y medicación.
+
+### Módulo 5 — Alimentación y costos (fase posterior)
+- 5 etapas: lactancia (~18% proteína), crecimiento (creep), desarrollo (recría), engorda y mantenimiento.
+- Requerimientos nutricionales fijos por etapa (los valida el MVZ Álvaro).
+- Catálogo de ingredientes con % de proteína fijo (ej. maíz 8.9%). **El precio por kg lo actualiza cada productor** (referencia Jalisco: $6.00–$6.50/kg).
+- Simulación de sustitución de ingredientes (cómo cambian el % de proteína y el costo, y si sigue cumpliendo el requerimiento).
+
+### Módulo 6 — Mortalidad e indicadores
+- % de nacimientos logrados, % de mortalidad al nacimiento (meta 2–3%, alerta si sube), % de crías que llegan vivas al destete, peso promedio al destete.
+- Detección de vientres improductivos (hembras que no parieron ni gestaron en el año).
+
+### Módulo 7 — QR y Marketplace (fase posterior)
+- QR por animal para exposiciones: muestra la ficha pública (genealogía, pesos, campeonatos).
+- Pestaña de ventas y, a futuro, subastas.
+
+### Exportación / importación Excel ("Sábana") [CONFIRMADO, prioridad alta]
+El productor quiere capturar en la app y que esta **genere el .xlsx** con el formato de `SABANA OCT 2026 DORPER.xlsx` (24 columnas, A–X):
+
+| Col | Campo | Col | Campo |
+|---|---|---|---|
+| A | Folio | M | Peso destete |
+| B | ADN | N | Tipo destete/parto |
+| C | Chip SINIIGA | O | Padre |
+| D | Fecha nacimiento | P | Folio padre |
+| E | Fecha destete | Q | Madre |
+| F | Edad meses | R | Folio madre |
+| G | Edad días | S | Raza |
+| H | Peso nacimiento | T | Tipo de parto |
+| I | Peso 120 días | U | Concepción (MN/IA/TE) |
+| J | Peso 150 días | V | Color |
+| K | Peso a la evaluación | W | Sexo |
+| L | Circunferencia testicular (machos) | X | Fecha de corte (=AHORA()) |
+
+Razas activas: Dorper, Pelifolk, Pelibuey, Katahdin, Blackbelly, Suffolk, Charollais, Hampshire, Dorset (10–12 en Jalisco/México).
+
+## 8. Fórmulas e indicadores (Excel *Proyección_Producción_Ovina.xlsx*, Mtro. Meléndez)
+
+- **% de preñez** = hembras preñadas / hembras expuestas al empadre.
+- **% de partos** = paridas / preñadas (descuenta abortos y muerte en gestación). Globalmente también se usa partos / expuestas.
+- **Prolificidad** = crías nacidas / oveja parida (ej. 1.50).
+- **Intervalo entre ciclos** = empadre + gestación + lactancia + descanso post-destete (días).
+- **Días de engorda** = (peso final − peso al destete) / ganancia diaria en engorda.
+- **Consumo de alimento:** kg de materia seca (MS)/animal/día ÷ % MS de la dieta = kg tal como se ofrece (TCO); × precio por kg TCO = costo.
+- Modelo determinista basado en promedios. Los sementales se redondean hacia arriba. La mortalidad de ovejas y el desecho son tasas **anuales** prorrateadas según la duración del ciclo.
+
+**Parámetros base (editables):**
+
+| Variable | Valor | Variable | Valor |
+|---|---|---|---|
+| Hembras | 10 | MOveja (mort. anual ovejas) | 4% |
+| RelHM (hembras/semental) | 25 | MPre (mort. crías nac–destete) | 10% |
+| DEmp (empadre) | 35 d | MEng (mort. engorda) | 3% |
+| DGest (gestación) | 150 d | MRec (mort. recría) | 3% |
+| DLact (lactancia) | 60 d | Desecho anual ovejas | 20% |
+| DRecup (descanso) | 30 d | PNac | 3.2 kg |
+| Edad1Emp | 270 d | PDest | 17 kg |
+| PPrenez | 88% | GDPEng | 0.250 kg/d |
+| PParto | 95% | PFinal | 45 kg |
+| Prolif | 1.50 | PDesecho | 42 kg |
+| SexoH | 50% | PrecioCordero | $50/kg (hoy hasta ~$90) |
+| PRet (corderas retenidas) | 35% | PrecioDesecho | $30/kg |
+
+**Consumo por categoría (kg MS/día · % MS · $/kg TCO):** oveja vacía 1.20 · 90% · $1.80; gestante 1.40 · 90% · $1.80; lactancia 2.00 · 90% · $2.80; semental 1.60 · 90% · $2.00; cordero creep 0.15 · 89% · $8.00; engorda 1.30 · 89% · $6.50; cordera en recría 1.00 · 90% · $3.00.
+
+**Resultados de referencia (10 vientres):** 0.90 corderos finalizados/oveja expuesta; 40.6 kg de cordero/oveja/ciclo; 53.9 kg/oveja/año; costo total de alimento del ciclo ≈ $22,016.
+
+**Rentabilidad:** ingresos por venta − costo de alimento **no** es la utilidad neta. Hay que considerar también medicamentos, mano de obra, transporte, infraestructura, compra de animales y pérdidas por mortalidad.
+
+## 9. Requisitos (inventario del consolidado)
+
+- **RF-01** Autenticación segura (contraseñas con hash).
+- **RF-02** Administración de ranchos (nombre, domicilio, propietario, asociación).
+- **RF-03** La Asociación cambia de "rancho activo".
+- **RF-04** El dueño define permisos de sus encargados (cuentas rama).
+- **RF-05** Ficha individual y ciclo de vida.
+- **RF-06** Registro de nacimientos con madre, crías y foto (ventana de 30 días).
+- **RF-07** Corrección de nacimientos bloqueados solo por Asociación/Técnico, con evidencia.
+- **RF-08** Pesos, destetes, sanidad/vacunación y eventos.
+- **RF-09** Catálogo de ingredientes, fórmulas por etapa, sustituciones y costos.
+- **RF-10** Indicadores productivos y económicos (fórmulas del Excel).
+- **RF-11** Alerta de destete a los 75 días.
+- **RF-12** Ficha pública por QR.
+- **RF-13** Importar/exportar .xlsx compatible con la Sábana.
+- **RF-14** Captura offline con sincronización automática.
+- **RF-15** Pesos a 120/150 días, edad, progenitores y circunferencia testicular.
+- **RF-16** Inventario, promedios e indicadores agregados por rancho.
+- **RF-17** Historial de fallecidos (sin borrado físico).
+- **RF-18** Gastos, ingresos y utilidad.
+- **RF-19** Correcciones auditadas.
+- **RF-20** Genealogía bidireccional y árbol.
+- **RF-21** *(nuevo)* Alerta de parto próximo con ventana de ±2 días.
+- **RNF-01** Fluidez en Android de gama media/baja.
+- **RNF-02** Seguridad y aislamiento por rancho y usuario.
+- **RNF-03** Arquitectura mantenible y escalable.
+- **RNF-04** Captura rápida en campo: botones grandes, flujos directos, apta para usuarios mayores.
+
+## 10. Alcance del MVP (3 semanas)
+
+**Incluido (Fase 1, recomendada por el MVZ Álvaro):**
+1. Login, ranchos y los 3 roles con permisos.
+2. Ficha individual e inventario (hembras, sementales, crías) con navegación genealógica.
+3. Nacimientos con candado de 30 días, foto y corrección solo por Asociación (auditada).
+4. Pesos (nacimiento, destete, 120 y 150 días), ganancia diaria, alerta de destete a los 75 días y alerta de parto próximo.
+5. Captura offline con sincronización.
+6. Exportación de la Sábana a .xlsx (24 columnas).
+7. Indicadores esenciales (% de preñez, % de partos, prolificidad, mortalidad, peso promedio al destete).
+
+**Fuera del MVP (fases posteriores):** formulación nutricional con sustitución de ingredientes, QR, marketplace/subastas, campeonatos, analítica financiera completa y multi-asociación nacional.
+
+**Valor agregado opcional:** lectura **NFC** del arete interno (sticker NTAG213/215 que solo guarda el ID del animal) para abrir la ficha al acercar el celular. Notas:
+- El emulador no lee NFC: se programa una interfaz `LectorArete` con una versión real y otra simulada.
+- El chip oficial SINIIGA suele ser RFID de baja frecuencia (134.2 kHz) y **un celular no lo lee**.
+- El NFC no lo pidieron los stakeholders; es idea del equipo.
+- Plan: comprar unos pocos stickers NFC NTAG213/215 (gasto mínimo) y pedir prestado un Android con NFC para la demo. Respaldo: un **código QR impreso** con el ID del animal, que abre la misma ficha y adelanta el RF-12. La lectura se programa detrás de la interfaz `LectorArete`, que admite NFC, QR o simulado.
+
+## 11. Arquitectura técnica [PROPUESTO]
+
+**Regla general: no pagar servicios.** Solo planes gratuitos o de estudiante (Azure for Students, GitHub Student Pack, Render/Neon/Supabase free tier, Trello free). Evitar cualquier servicio que pida tarjeta con cobro automático.
+
+- **App Android:** Kotlin + Jetpack Compose. BD local Room (offline-first). WorkManager para sincronizar y para las notificaciones locales.
+- **Backend:** Python + FastAPI (POO), API REST con autenticación por token (JWT).
+- **BD:** relacional (PostgreSQL o SQL Server), en plan gratuito/estudiante (Azure for Students, Neon, Render, etc.).
+- **Panel web** para la Asociación/Técnico (consulta multi-rancho, correcciones, descarga de Sábanas).
+- **Archivos/fotos:** almacenamiento gratuito (Azure Blob con crédito de estudiante, o similar).
+- **Sincronización:** cada operación pendiente lleva un **UUID**, el rancho y el usuario. Los reintentos son **idempotentes**. Pendiente definir la política de conflictos ("gana la última modificación" está por validar).
+- **Excel:** generación del .xlsx en el backend (openpyxl/pandas).
+- **Repositorio:** GitHub, con PRs obligatorios y revisión de código.
+
+**Entidades principales sugeridas:** `asociacion`, `rancho`, `usuario`, `permiso_rancho` (usuario–rancho–rol–permisos), `animal`, `evento_reproductivo` (empadre/monta), `parto`, `parto_cria`, `pesaje`, `evento_sanitario`, `corral`, `ubicacion_animal`, `baja` (muerte/venta/desecho), `correccion_auditoria`, `foto_evidencia`, `parametros_rancho`, `ingrediente`, `formula`, `precio_ingrediente`, `operacion_sync`.
+
+## 12. Plan de sprints [PROPUESTO]
+
+- **Sprint 1 (semana 1):** modelo de datos y BD en la nube, API de autenticación y roles, CRUD de ranchos y animales, app con login e inventario, lector NFC simulado.
+- **Sprint 2 (semana 2):** nacimientos con candado de 30 días y foto, pesos, alertas de destete y de parto, offline y sincronización, panel web de la Asociación con correcciones.
+- **Sprint 3 (semana 3):** indicadores, exportación de la Sábana, pruebas con NFC real (Android prestado), pulido de UX, documentación y presentación.
+
+## 13. Decisiones pendientes
+
+- Modelo de negocio (suscripción, licencia, pago por rama, etc.): se define en una versión posterior.
+- Si el Técnico/Veterinario es un rol independiente o un permiso ligado a una asociación.
+- Política de conflictos de la sincronización offline.
+- Alcance del árbol genealógico ("árbol de 4 ovejas": ¿4 ancestros o 4 generaciones?).
+- Qué costos no alimenticios entran en el cálculo de utilidad.
+- Si Cómputo en la nube acepta PaaS gratuitos o exige VM/contenedores.
+- Validar las fórmulas con los asesores de Agropecuaria.
+- Verificar que el nombre "Arete" no esté registrado en Play Store ni en el IMPI (MARCia).
+
+## 14. Glosario
+
+- **Borrega / vientre:** hembra reproductora.
+- **Semental:** macho reproductor (término acordado; no "padre").
+- **Empadre:** periodo en que las hembras se exponen al semental.
+- **Destete:** fin de la lactancia (~60–75 días).
+- **Recría:** crecimiento de las corderas de reemplazo hasta su primer empadre.
+- **Engorda:** finalización de corderos para venta o rastro.
+- **Creep feeding:** alimento para corderos lactantes.
+- **MN / IA / TE:** monta natural / inseminación artificial / transferencia de embriones.
+- **SINIIGA:** sistema nacional de identificación de ganado (arete oficial, prefijo 484).
+- **Sábana:** Excel consolidado de nacimientos y pesajes que se envía a la Asociación.
+- **Pie de cría:** animal vendido para reproducción.
+- **MS / TCO:** materia seca / tal como se ofrece.
+- **AGLOT:** asociación ganadera de Jalisco que participa en el proyecto.
