@@ -1,8 +1,6 @@
+fastapi[standard]==0.163.1
+psycopg[binary]==3.3.9
+SQLAlchemy==2.1.9
 alembic==1.20.1
-Mako==1.4.3
-MarkupSafe==3.0.4
-psycopg==3.3.9
-psycopg-binary==3.3.9
+pydantic-settings==2.16.3
 python-dotenv==1.2.4
-SQLAlchemy==2.1.8
-typing_extensions==4.16.0
