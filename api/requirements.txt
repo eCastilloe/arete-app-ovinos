@@ -4,3 +4,5 @@ SQLAlchemy==2.1.9
 alembic==1.20.1
 pydantic-settings==2.16.3
 python-dotenv==1.2.4
+pwdlib[argon2]==0.4.2
+PyJWT==2.15.1
