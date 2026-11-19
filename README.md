@@ -168,3 +168,17 @@ fun InventoryScreen(
 6. Mueve la tarjeta a "Hecho" en Trello con el enlace al PR.
 
 Tablero: https://trello.com/b/KVDt8V4n/aplicacion-ovina
+
+## Cómo hacer un endpoint nuevo (patrón HU-10)
+1. Recibe la conexión con `conn = Depends(get_db_usuario)` (de `app/deps.py`).
+2. Antes de leer o escribir, llama `validar_rancho(conn, rancho_id, "puede_capturar")`
+   (o "puede_editar" / "puede_exportar"; sin permiso = solo lectura).
+3. Nunca confíes en el `rancho_id` que manda el cliente.
+4. No existe o es de otro rancho → 404. Falta permiso → 403.
+5. Los errores OV001–OV010 se traducen solos a 403/409/422 en español.
+Ejemplo: `app/routers/animales.py`.
+
+## Pruebas
+Desde `api/`: `pytest`. Las que usan BD se saltan si no hay una real.
+Para correrlas contra la rama `dev`: `set -a; source .env; set +a` y luego `pytest`.
+En `.env`, pon las URLs entre comillas simples (las de Neon traen `&`).
