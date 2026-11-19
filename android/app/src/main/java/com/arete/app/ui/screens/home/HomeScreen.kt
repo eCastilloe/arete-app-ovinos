@@ -16,11 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arete.app.ui.components.AreteSecondaryButton
+import com.arete.app.ui.components.AreteButton
 import com.arete.app.ui.components.Sex
 import com.arete.app.ui.components.SexChip
 
 @Composable
 fun HomeScreen(
+    onInventory: () -> Unit = {},
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory)
 ) {
     val pendingCount by viewModel.pendingCount.collectAsState()
@@ -46,6 +48,7 @@ fun HomeScreen(
                 SexChip(sex = Sex.MALE)
             }
             Spacer(modifier = Modifier.weight(1f))
+            AreteButton(text = "Ver inventario", onClick = onInventory)
             AreteSecondaryButton(text = "Cerrar sesión", onClick = viewModel::logout)
         }
     }

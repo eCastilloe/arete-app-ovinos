@@ -14,6 +14,7 @@ import androidx.room.Room
 import com.arete.app.data.local.AppDatabase
 import com.arete.app.data.repository.AuthRepository
 import com.arete.app.data.repository.SyncRepository
+import com.arete.app.data.repository.InventoryRepositoryFactory
 
 class AppContainer(context: Context) {
 
@@ -52,4 +53,5 @@ class AppContainer(context: Context) {
 
     val authRepository = AuthRepository(apiService, tokenStorage)
     val syncRepository = SyncRepository(database.pendingOperationDao())
+    val inventoryRepository = InventoryRepositoryFactory.create(tokenStorage)
 }

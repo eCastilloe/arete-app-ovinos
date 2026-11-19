@@ -13,6 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.arete.app.ui.screens.home.HomeScreen
 import com.arete.app.ui.screens.login.LoginScreen
+import com.arete.app.ui.screens.inventory.InventoryScreen
 
 @Composable
 fun AreteNavHost(isLoggedIn: Boolean?) {
@@ -30,12 +31,18 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable(AppRoutes.LOGIN) { LoginScreen() }
-        composable(AppRoutes.HOME) { HomeScreen() }
+        composable(AppRoutes.HOME) {
+            HomeScreen(onInventory = { navController.navigate(AppRoutes.INVENTORY) { launchSingleTop = true } })
+        }
+        composable(AppRoutes.INVENTORY) {
+            InventoryScreen(onHome = { navController.popBackStack(AppRoutes.HOME, false) })
+        }
     }
 
     LaunchedEffect(isLoggedIn) {
         val target = if (isLoggedIn) AppRoutes.HOME else AppRoutes.LOGIN
-        if (navController.currentDestination?.route != target) {
+        val current = navController.currentDestination?.route
+        if ((!isLoggedIn && current != AppRoutes.LOGIN) || (isLoggedIn && current == AppRoutes.LOGIN)) {
             navController.navigate(target) {
                 popUpTo(navController.graph.id) { inclusive = true }
                 launchSingleTop = true
