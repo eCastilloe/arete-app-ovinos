@@ -2,12 +2,12 @@ import os
 import uuid
 
 import pytest
-from fastapi import Depends
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app.db import engine
-from app.deps import get_db_usuario
+from app.deps import DbUsuario, validar_rancho
 from app.main import app
 from app.seguridad import hashear_password
 
@@ -61,6 +61,8 @@ def datos():
               (:prod1, :r1, 'productor'), (:enc1, :r1, 'encargado'), (:prod2, :r2, 'productor')
         """), {"prod1": prod1, "enc1": enc1, "prod2": prod2, "r1": r1, "r2": r2})
     return {
+        "prod1": prod1,
+        "r1": r1,
         "enc1": enc1,
         "email_prod1": email_prod1,
         "email_enc1": email_enc1,
@@ -98,7 +100,7 @@ def test_sin_token_da_401():  # no usa la BD
 @bd
 def test_errores_ov_se_traducen():
     @app.get("/_prueba_ov")
-    def _ruta(conn=Depends(get_db_usuario)):
+    def _ruta(conn: DbUsuario):
         conn.execute(text(
             "DO $$ BEGIN RAISE EXCEPTION USING ERRCODE = 'OV009', MESSAGE = 'x'; END $$"))
 
@@ -107,3 +109,30 @@ def test_errores_ov_se_traducen():
     r = client.get("/_prueba_ov", headers={"Authorization": f"Bearer {_token(email)}"})
     assert r.status_code == 409
     assert r.json() == {"codigo": "OV009", "detalle": "El animal no está disponible"}
+    
+
+def _validar_como(usuario_id, rancho_id, permiso):
+    with engine.begin() as conn:
+        conn.execute(text("SELECT set_config('app.usuario_id', :u, true)"), {"u": usuario_id})
+        validar_rancho(conn, rancho_id, permiso)
+
+
+@bd
+def test_productor_tiene_todos_los_permisos(datos):
+    for permiso in ("puede_capturar", "puede_editar", "puede_exportar"):
+        _validar_como(datos["prod1"], datos["r1"], permiso)  # no debe lanzar
+
+
+@bd
+def test_encargado_sin_permiso_de_exportar_da_403(datos):  # CA-04.2
+    with engine.begin() as conn:  # la prueba de revocación lo deja inactivo
+        conn.execute(text("UPDATE membresia_rancho SET activo = true WHERE usuario_id = :u"),
+                     {"u": datos["enc1"]})
+    with pytest.raises(HTTPException) as e:
+        _validar_como(datos["enc1"], datos["r1"], "puede_exportar")
+    assert e.value.status_code == 403
+
+
+def test_permiso_desconocido_se_rechaza():  # no usa la BD
+    with pytest.raises(ValueError):
+        validar_rancho(None, uuid.uuid4(), "puede_editar OR true")
