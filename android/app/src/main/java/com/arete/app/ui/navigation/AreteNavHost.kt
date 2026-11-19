@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.navigation.navArgument
 import android.net.Uri
 import com.arete.app.ui.screens.animal.AnimalEditorScreen
+import com.arete.app.ui.screens.animal.AnimalDetailScreen
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -43,13 +44,24 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
             val refresh by entry.savedStateHandle.getStateFlow("inventoryRefresh", 0L).collectAsState()
             InventoryScreen(onHome = { navController.popBackStack(AppRoutes.HOME, false) },
                 onAdd = { navController.navigate("animal-editor") },
+                onOpen = { id -> navController.navigate("animal-detail/${Uri.encode(id)}") }, refreshKey = refresh)
+        }
+        composable("animal-detail/{animalId}") { entry ->
+            val refresh by entry.savedStateHandle.getStateFlow("detailRefresh", 0L).collectAsState()
+            AnimalDetailScreen(onBack = { navController.popBackStack() },
+                onHome = { navController.popBackStack(AppRoutes.HOME, false) },
                 onEdit = { id -> navController.navigate("animal-editor?animalId=${Uri.encode(id)}") }, refreshKey = refresh)
         }
         composable("animal-editor?animalId={animalId}", arguments = listOf(navArgument("animalId") { defaultValue = "" })) {
+            val backLabel = remember {
+                if (navController.previousBackStackEntry?.destination?.route == "animal-detail/{animalId}")
+                    "Volver a la ficha" else "Volver al inventario"
+            }
             AnimalEditorScreen(onBack = { navController.popBackStack() }, onSaved = {
-                navController.previousBackStackEntry?.savedStateHandle?.set("inventoryRefresh", System.nanoTime())
+                navController.getBackStackEntry(AppRoutes.INVENTORY).savedStateHandle["inventoryRefresh"] = System.nanoTime()
+                navController.previousBackStackEntry?.savedStateHandle?.set("detailRefresh", System.nanoTime())
                 navController.popBackStack()
-            })
+            }, backLabel = backLabel)
         }
     }
 

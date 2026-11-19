@@ -37,10 +37,11 @@ import java.util.Locale
 
 @Composable
 fun InventoryScreen(onHome: () -> Unit, viewModel: InventoryViewModel = viewModel(factory = InventoryViewModel.Factory),
-    onAdd: (() -> Unit)? = null, onEdit: ((String) -> Unit)? = null, refreshKey: Long = 0L) {
+    onAdd: (() -> Unit)? = null, onEdit: ((String) -> Unit)? = null, refreshKey: Long = 0L,
+    onOpen: ((String) -> Unit)? = null) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(refreshKey) { if (refreshKey != 0L) viewModel.retry() }
-    InventoryContent(state, viewModel::search, viewModel::selectCategory, viewModel::toggleDischarged, viewModel::retry, onHome, onAdd, onEdit)
+    InventoryContent(state, viewModel::search, viewModel::selectCategory, viewModel::toggleDischarged, viewModel::retry, onHome, onAdd, onEdit, onOpen)
 }
 
 @Composable
@@ -52,7 +53,8 @@ internal fun InventoryContent(
     onRetry: () -> Unit,
     onHome: () -> Unit,
     onAdd: (() -> Unit)? = null,
-    onEdit: ((String) -> Unit)? = null
+    onEdit: ((String) -> Unit)? = null,
+    onOpen: ((String) -> Unit)? = null
 ) {
     val listState = rememberLazyListState()
     val contentFocus = remember { FocusRequester() }
@@ -183,7 +185,7 @@ internal fun InventoryContent(
                         }, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("inventory-empty"))
                     }
                     items(state.animals, key = { it.id }, contentType = { "animal" }) { animal ->
-                        AnimalRow(animal, if (state.canEdit) onEdit else null)
+                        AnimalRow(animal, if (state.canEdit) onEdit else null, onOpen)
                     }
                 }
             }
@@ -192,7 +194,7 @@ internal fun InventoryContent(
 }
 
 @Composable
-private fun AnimalRow(animal: InventoryAnimal, onEdit: ((String) -> Unit)?) {
+private fun AnimalRow(animal: InventoryAnimal, onEdit: ((String) -> Unit)?, onOpen: ((String) -> Unit)?) {
     Column(Modifier.fillMaxWidth().testTag("animal-${animal.id}"), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             AnimalTag(animal, Modifier.width(118.dp))
@@ -208,6 +210,7 @@ private fun AnimalRow(animal: InventoryAnimal, onEdit: ((String) -> Unit)?) {
             Text("SINIIGA $number", style = MaterialTheme.typography.bodySmall, color = Ink,
                 modifier = Modifier.background(Siniiga, MaterialTheme.shapes.extraSmall).padding(horizontal = 8.dp, vertical = 4.dp))
         }
+        if (onOpen != null) AreteSecondaryButton("Ver ficha · ${animal.folio}", { onOpen(animal.id) }, Modifier.testTag("open-${animal.id}"))
         if (onEdit != null) AreteSecondaryButton("Editar ficha · ${animal.folio}", { onEdit(animal.id) }, Modifier.testTag("edit-${animal.id}"))
         HorizontalDivider(color = Line)
     }
