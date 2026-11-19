@@ -7,7 +7,7 @@ from app.main import app
 
 def test_salud_responde_200():
     r = TestClient(app).get("/salud")
-    assert r.status_code == 200
+    assert r.status_code == 20
     assert r.json()["estado"] == "ok"
 
 def test_docs_disponible():
