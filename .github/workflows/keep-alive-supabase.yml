@@ -4,8 +4,7 @@ on:
   schedule:
     - cron: "43 14 * * *"   # diario 14:43 UTC = 8:43 a. m. en Ciudad de México
   workflow_dispatch:
-  push:
-    branches: [feature/HU-06-keep-alive]   # TEMPORAL: solo para probar; se quita antes del merge
+  
 
 permissions:
   contents: read
