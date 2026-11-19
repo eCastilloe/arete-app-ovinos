@@ -9,8 +9,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: pruebas-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   pytest:
+    # NO RENOMBRAR: "pytest (api)" es check obligatorio en la protección de main.
+    # Si cambia, todos los PRs se quedan esperando un check que ya no existe.
     name: pytest (api)
     runs-on: ubuntu-latest
     timeout-minutes: 10
