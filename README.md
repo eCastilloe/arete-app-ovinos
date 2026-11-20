@@ -16,6 +16,7 @@ Proyecto final integrador UAG · Entrega: 3 de diciembre de 2026.
 
 ### Requisitos
 - Android Studio (versión estable reciente). Trae el JDK, Kotlin y Gradle; no instales nada aparte.
+- Para correr Gradle desde PowerShell (`.\gradlew.bat`), apunta `JAVA_HOME` al JDK que trae Android Studio: `$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"`. Para dejarlo fijo: `[Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\Program Files\Android\Android Studio\jbr", "User")` y abre una terminal nueva. Desde Android Studio no hace falta.
 - En **SDK Manager**: Android 8.0 (API 26) instalado.
 - Un emulador **API 26 con 2 GB de RAM** (así se prueba según la Definition of Done). Usa un perfil genérico como "Medium Phone": el Pixel 4 no ofrece API 26.
 
@@ -158,6 +159,49 @@ fun InventoryScreen(
 
 ---
 
+## Leer un arete (LectorArete)
+
+Toda lectura de aretes pasa por la interfaz `reader/LectorArete`. Tu pantalla **nunca** crea un lector concreto (`SimulatedLectorArete`, NFC, QR): lo recibe tu ViewModel desde `AppContainer`. Así, cuando llegue la lectura NFC/QR (HU-54), se cambia una sola línea en `AppContainer` y tu pantalla sigue igual.
+
+Hoy el lector es **simulado**: espera 0.6 s y siempre devuelve el animal de prueba `00000000-0000-4000-8000-000000000001`, así funciona en el emulador.
+
+**1. Recibe el lector en tu ViewModel** (el tipo es la interfaz, no la implementación):
+```kotlin
+class InventoryViewModel(
+    private val inventoryRepository: InventoryRepository,
+    lectorArete: LectorArete
+) : ViewModel() { ... }
+
+// En su Factory:
+InventoryViewModel(app.container.inventoryRepository, app.container.lectorArete)
+```
+
+**2. Usa `TagReader` para leer y publicar el estado** (`Idle`, `Reading`, `Found`, `Error`). No copies la lógica; ya está probada en `TagReaderTest`:
+```kotlin
+private val tagReader = TagReader(lectorArete, viewModelScope)
+val readerState: StateFlow<ReaderState> = tagReader.state
+
+fun readTag() { tagReader.readTag() }
+fun onAnimalOpened() { tagReader.onAnimalOpened() }
+```
+
+**3. En la pantalla, navega cuando llegue `Found`** y avisa al ViewModel para no navegar dos veces:
+```kotlin
+LaunchedEffect(readerState) {
+    val state = readerState
+    if (state is ReaderState.Found) {
+        onAnimalRead(state.animalId)
+        viewModel.onAnimalOpened()
+    }
+}
+```
+
+**4. Abre la ficha con la ruta compartida:** `navController.navigate(AppRoutes.animalDetail(animalId))`. La ruta es `animal/{animalId}`. La ficha actual (`ui/screens/animal/AnimalDetailScreen.kt`) es provisional; la HU-19 la reemplaza **conservando esa ruta**.
+
+Revisión de PRs (CA-N03.4): si una pantalla escribe `SimulatedLectorArete()` o importa una clase de NFC/QR, el PR no se aprueba.
+
+---
+
 ## Flujo de trabajo
 
 1. Crea tu rama desde `main`: `feature/HU-XX-descripcion-corta`
@@ -179,7 +223,9 @@ Tablero: https://trello.com/b/KVDt8V4n/aplicacion-ovina
 Ejemplo: `app/routers/animales.py`.
 
 ## Pruebas
-Desde `api/`: `pytest`. Las que usan BD se saltan si no hay una real.
+**Android:** desde `android/`: `.\gradlew.bat testDebugUnitTest` (necesita `JAVA_HOME`, ver Requisitos). Cada prueba unitaria va en `app/src/test/java/` dentro de la carpeta de su paquete (por ejemplo `com/arete/app/reader/`).
+
+**Backend:** desde `api/`: `pytest`. Las que usan BD se saltan si no hay una real.
 Para correrlas contra la rama `dev`: `set -a; source .env; set +a` y luego `pytest`.
 En `.env`, pon las URLs entre comillas simples (las de Neon traen `&`).
 

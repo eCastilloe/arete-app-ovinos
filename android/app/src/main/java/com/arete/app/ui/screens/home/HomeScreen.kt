@@ -10,25 +10,38 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.arete.app.reader.ReaderState
+import com.arete.app.ui.components.AreteButton
 import com.arete.app.ui.components.AreteSecondaryButton
 import com.arete.app.ui.components.Sex
 import com.arete.app.ui.components.SexChip
 
 @Composable
 fun HomeScreen(
+    onAnimalRead: (animalId: String) -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory)
 ) {
     val pendingCount by viewModel.pendingCount.collectAsState()
+    val readerState by viewModel.readerState.collectAsState()
 
     val syncStatus = when (pendingCount) {
         0 -> "Al día"
         1 -> "1 registro pendiente por subir"
         else -> "$pendingCount registros pendientes por subir"
+    }
+
+    LaunchedEffect(readerState) {
+        val state = readerState
+        if (state is ReaderState.Found) {
+            onAnimalRead(state.animalId)
+            viewModel.onAnimalOpened()
+        }
     }
 
     Scaffold { innerPadding ->
@@ -46,6 +59,20 @@ fun HomeScreen(
                 SexChip(sex = Sex.MALE)
             }
             Spacer(modifier = Modifier.weight(1f))
+
+            val errorState = readerState as? ReaderState.Error
+            if (errorState != null) {
+                Text(
+                    text = errorState.message,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            AreteButton(
+                text = if (readerState is ReaderState.Reading) "Leyendo arete…" else "Leer arete",
+                onClick = viewModel::readTag,
+                enabled = readerState !is ReaderState.Reading
+            )
             AreteSecondaryButton(text = "Cerrar sesión", onClick = viewModel::logout)
         }
     }
