@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      PG_IMAGE: postgres:16   # debe coincidir con la versión de Neon; si Neon sube de versión, cambiar aquí
+      PG_IMAGE: postgres:17   # debe coincidir con la versión de Neon; si Neon sube de versión, cambiar aquí
     steps:
       - name: Revisar que existan los secretos
         env:
