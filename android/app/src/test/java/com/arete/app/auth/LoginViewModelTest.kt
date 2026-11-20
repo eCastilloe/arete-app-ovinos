@@ -26,9 +26,10 @@ class LoginViewModelTest {
     private val api = object : ApiService {
         override suspend fun login(request: LoginRequest): LoginResponse { calls++; return handler(request) }
         override suspend fun getHealth(): Response<Map<String, Any>> = error("Not used")
+        override suspend fun getCurrentUser(): Response<Map<String, String>> = error("Not used")
         override fun refresh(request: RefreshRequest): Call<LoginResponse> = error("Not used")
     }
-    private fun model() = LoginViewModel(AuthRepository(api, sessions) { TEST_NOW })
+    private fun model() = LoginViewModel(AuthRepository(api, sessions, now = { TEST_NOW }))
     @Before fun setUp() { Dispatchers.setMain(dispatcher) }
     @After fun tearDown() { Dispatchers.resetMain() }
 
@@ -89,7 +90,7 @@ class LoginViewModelTest {
     @Test fun sessionExpiresWhileAppRemainsOpen() = runTest(dispatcher) {
         sessions.saveSession(testSession(refreshExpiry = TEST_NOW + 2000))
         val states = mutableListOf<Boolean>()
-        val repository = AuthRepository(api, sessions) { TEST_NOW + testScheduler.currentTime }
+        val repository = AuthRepository(api, sessions, now = { TEST_NOW + testScheduler.currentTime })
         val collector = launch { repository.isLoggedIn.take(2).toList(states) }
         runCurrent()
         assertEquals(listOf(true), states)

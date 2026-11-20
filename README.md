@@ -64,7 +64,7 @@ $adbArete = "$env:LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
 
 Verificar primero el identificador del emulador con `adb devices` y cambiar `emulator-5554` si corresponde. El resultado válido debe indicar `OK (6 tests)` y ningún fallo. Las pruebas JVM incluyen 16 casos de HU-08 y el caso inicial del proyecto.
 
-**Pendiente de integración del equipo:** probar con una cuenta real contra la API desplegada y obtener el rol/permisos desde el servidor. En la base actual, `/auth/yo` devuelve solo `usuario_id` y la navegación tiene una pantalla principal común. Por ello, las pruebas locales no completan todavía el criterio de pantalla principal según rol ni la Definition of Done del equipo.
+**Integración con Render (19 nov):** ya se probaron las dos cuentas reales de ejemplo del equipo. El acuerdo recibido es que productor y encargado llegan a Inventario en HU-08; los permisos detallados corresponden a HU-12. La rama `codex/HU-08-integracion` reúne HU-08 y HU-18 para comprobar esa navegación y se prepara como entrega en borrador. La lista real de animales depende de HU-17/HU-18. Sigue pendiente observar la caducidad natural con tiempos cortos confirmados: las respuestas verificadas aún entregan 60 minutos de acceso y 30 días de refresh. Consulta [la guía y evidencia](docs/hu08_integracion_real.md).
 
 ---
 
@@ -108,7 +108,7 @@ com.arete.app/
 Reglas clave:
 - **Las pantallas no llaman a Retrofit ni a Room.** Siempre pasan por un ViewModel y un Repository.
 - **Sin Hilt:** las dependencias se crean en `di/AppContainer.kt` y cada ViewModel tiene su `Factory`.
-- **Sesión:** DataStore guarda ambos tokens y su caducidad, sin contraseña. El `AuthInterceptor` renueva el acceso vencido antes de enviar una petición y agrega `Authorization: Bearer <token>`. Un **401** definitivo cierra la sesión y `AreteNavHost` regresa al login; un fallo temporal de conexión o del servidor durante la renovación conserva la sesión mientras el refresh siga vigente. Al vencer el refresh, la app vuelve al login incluso si no hace peticiones. La demo no envía credenciales a la API. Las pantallas no llaman directamente a la renovación.
+- **Sesión:** DataStore guarda ambos tokens y su caducidad, sin contraseña. El `AuthInterceptor` renueva el acceso vencido antes de enviar una petición y agrega `Authorization: Bearer <token>`. Ante un **401**, intenta renovar y repite una vez; si la renovación o el reintento devuelve 401, cierra la sesión y vuelve al login. Un fallo temporal de conexión o del servidor conserva la sesión mientras el refresh siga vigente. Al vencer el refresh, la app vuelve al login incluso si no hace peticiones. Al regresar al primer plano se comprueba la sesión mediante `/auth/yo`. La demo no envía credenciales a la API.
 - **Nunca** escribas URLs, contraseñas ni tokens en el código.
 
 ---

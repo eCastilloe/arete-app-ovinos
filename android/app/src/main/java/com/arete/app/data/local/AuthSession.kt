@@ -11,6 +11,7 @@ data class AuthSession(
     val refreshExpiresAt: Long,
     val isDemo: Boolean = false
 ) {
+    override fun toString() = "AuthSession(redacted)"
     fun isValid(now: Long): Boolean = isDemo || refreshExpiresAt > now
 
     companion object {

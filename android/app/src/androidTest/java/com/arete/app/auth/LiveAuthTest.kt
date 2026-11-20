@@ -48,7 +48,7 @@ class LiveAuthTest {
             sessions.saveSession(original.copy(accessToken = invalidSignature(original.accessToken)))
             assertTrue("401 refresh and retry $key", privateApi.getCurrentUser().isSuccessful)
             val renewed = requireNotNull(sessions.getSession())
-            assertNotEquals(original.accessToken, renewed.accessToken)
+            assertTrue("Access token replaced", original.accessToken != renewed.accessToken)
             // Both signatures invalid: real 401 from refresh must clear only this test session.
             sessions.saveSession(renewed.copy(accessToken = invalidSignature(renewed.accessToken),
                 refreshToken = invalidSignature(renewed.refreshToken)))
