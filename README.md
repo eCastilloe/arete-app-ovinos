@@ -169,14 +169,21 @@ Hoy el lector es **simulado**: espera 0.6 s y siempre devuelve el animal de prue
 ```kotlin
 class InventoryViewModel(
     private val inventoryRepository: InventoryRepository,
-    private val lectorArete: LectorArete
+    lectorArete: LectorArete
 ) : ViewModel() { ... }
 
 // En su Factory:
 InventoryViewModel(app.container.inventoryRepository, app.container.lectorArete)
 ```
 
-**2. Lee y publica el estado** con `ReaderState` (`Idle`, `Reading`, `Found`, `Error`). Copia `readTag()` y `onAnimalOpened()` de `ui/screens/home/HomeViewModel.kt`.
+**2. Usa `TagReader` para leer y publicar el estado** (`Idle`, `Reading`, `Found`, `Error`). No copies la lógica; ya está probada en `TagReaderTest`:
+```kotlin
+private val tagReader = TagReader(lectorArete, viewModelScope)
+val readerState: StateFlow<ReaderState> = tagReader.state
+
+fun readTag() { tagReader.readTag() }
+fun onAnimalOpened() { tagReader.onAnimalOpened() }
+```
 
 **3. En la pantalla, navega cuando llegue `Found`** y avisa al ViewModel para no navegar dos veces:
 ```kotlin

@@ -12,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.arete.app.reader.SimulatedLectorArete
 import com.arete.app.ui.components.AreteSecondaryButton
 import com.arete.app.ui.theme.AreteTheme
 
@@ -51,6 +50,6 @@ fun AnimalDetailScreen(
 @Composable
 private fun AnimalDetailScreenPreview() {
     AreteTheme {
-        AnimalDetailScreen(animalId = SimulatedLectorArete.TEST_ANIMAL_ID, onBack = {})
+            AnimalDetailScreen(animalId = "00000000-0000-4000-8000-000000000001", onBack = {})
     }
 }
