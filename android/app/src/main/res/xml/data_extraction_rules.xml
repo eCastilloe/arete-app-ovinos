@@ -5,6 +5,7 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="file" path="hu12-demo/" />
         <exclude domain="file" path="hu19-demo/" />
         <exclude domain="file" path="animal-photos/" />
         <!-- TODO: Use <include> and <exclude> to control what is backed up.
@@ -13,6 +14,7 @@
         -->
     </cloud-backup>
     <device-transfer>
+        <exclude domain="file" path="hu12-demo/" />
         <exclude domain="file" path="hu19-demo/" />
         <exclude domain="file" path="animal-photos/" />
     </device-transfer>

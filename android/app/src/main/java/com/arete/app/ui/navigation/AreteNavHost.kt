@@ -9,6 +9,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalContext
+import com.arete.app.AreteApplication
+import com.arete.app.data.model.RanchAccess
+import com.arete.app.ui.screens.team.TeamScreen
 import androidx.navigation.navArgument
 import android.net.Uri
 import com.arete.app.ui.screens.animal.AnimalEditorScreen
@@ -33,13 +39,18 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
     }
 
     val navController = rememberNavController()
+    val application = LocalContext.current.applicationContext as AreteApplication
+    val access by application.container.teamRepository.access.collectAsState()
+    var previousAccess by remember { mutableStateOf<RanchAccess?>(null) }
     val startDestination = remember { if (isLoggedIn) AppRoutes.HOME else AppRoutes.LOGIN }
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable(AppRoutes.LOGIN) { LoginScreen() }
         composable(AppRoutes.HOME) {
-            HomeScreen(onInventory = { navController.navigate(AppRoutes.INVENTORY) { launchSingleTop = true } })
+            HomeScreen(onInventory = { navController.navigate(AppRoutes.INVENTORY) { launchSingleTop = true } },
+                onTeam = { navController.navigate("team") { launchSingleTop = true } })
         }
+        composable("team") { TeamScreen(onBack = { navController.popBackStack() }) }
         composable(AppRoutes.INVENTORY) { entry ->
             val refresh by entry.savedStateHandle.getStateFlow("inventoryRefresh", 0L).collectAsState()
             InventoryScreen(onHome = { navController.popBackStack(AppRoutes.HOME, false) },
@@ -74,5 +85,11 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
                 launchSingleTop = true
             }
         }
+    }
+    LaunchedEffect(access) {
+        val route = navController.currentDestination?.route
+        if (previousAccess != null && previousAccess != access && route != AppRoutes.HOME && route != AppRoutes.LOGIN)
+            navController.popBackStack(AppRoutes.HOME, false)
+        previousAccess = access
     }
 }

@@ -6,6 +6,7 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
+    <exclude domain="file" path="hu12-demo/" />
     <!-- HU-19 fixtures and local photos stay on the testing device. -->
     <exclude domain="file" path="hu19-demo/" />
     <exclude domain="file" path="animal-photos/" />

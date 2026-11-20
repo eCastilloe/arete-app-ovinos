@@ -17,6 +17,9 @@ import com.arete.app.data.repository.SyncRepository
 import com.arete.app.data.repository.InventoryRepositoryFactory
 import com.arete.app.data.repository.AnimalEditorRepositoryFactory
 import com.arete.app.data.repository.LocalAnimalDetailRepository
+import com.arete.app.data.repository.TeamRepositoryFactory
+import com.arete.app.data.repository.PermissionInventoryRepository
+import com.arete.app.data.repository.PermissionAnimalEditorRepository
 import com.arete.app.data.local.AnimalPhotoStore
 
 class AppContainer(context: Context) {
@@ -56,8 +59,9 @@ class AppContainer(context: Context) {
 
     val authRepository = AuthRepository(apiService, tokenStorage)
     val syncRepository = SyncRepository(database.pendingOperationDao())
-    val inventoryRepository = InventoryRepositoryFactory.create(context, tokenStorage)
-    val animalEditorRepository = AnimalEditorRepositoryFactory.create(context, tokenStorage)
+    val teamRepository = TeamRepositoryFactory.create(context, tokenStorage)
+    val inventoryRepository = PermissionInventoryRepository(InventoryRepositoryFactory.create(context, tokenStorage), teamRepository)
+    val animalEditorRepository = PermissionAnimalEditorRepository(AnimalEditorRepositoryFactory.create(context, tokenStorage), teamRepository)
     val animalDetailRepository = LocalAnimalDetailRepository(animalEditorRepository)
     val animalPhotoStore = AnimalPhotoStore(context.applicationContext)
 }
