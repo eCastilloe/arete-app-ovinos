@@ -56,7 +56,7 @@ jobs:
           printf '%s' "$PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
             --passphrase-fd 0 --symmetric --cipher-algo AES256 \
             --output "$ARCHIVO.gpg" "$ARCHIVO"
-          shred -u "$ARCHIVO" contenido.txt
+          rm -f "$ARCHIVO" contenido.txt
 
       - name: Subir artefacto
         uses: actions/upload-artifact@v7
