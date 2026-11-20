@@ -187,7 +187,6 @@ En `.env`, pon las URLs entre comillas simples (las de Neon traen `&`).
 
 Cada domingo a las 3:17 a. m. (hora de Ciudad de México), GitHub Actions saca un `pg_dump` de Neon `production`, lo cifra con AES-256 y lo guarda como artefacto por 90 días (Actions → Respaldo semanal de la BD). También se puede correr a mano con "Run workflow".
 
-Un workflow diario (Keep-alive de Supabase) lista el bucket `evidencias` para que el proyecto gratuito no se pause.
 
 Para restaurar:
 1. Descarga el artefacto y descomprímelo.
