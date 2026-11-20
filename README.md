@@ -28,7 +28,43 @@ Proyecto final integrador UAG · Entrega: 3 de diciembre de 2026.
    - `10.0.2.2` es el `localhost` de tu computadora visto desde el emulador.
    - Para usar la API en la nube, poner la URL de Render. **Siempre termina en `/`.**
 3. Esperar el **Gradle Sync** y correr la app con **▶️ Run** en el emulador API 26.
-4. Mientras la API no esté lista, entrar con **"Entrar en modo demo"** (solo aparece en modo desarrollo).
+4. Mientras la API no esté lista, entrar con **"Entrar en modo demo"** (solo aparece en modo desarrollo). Para probar el formulario completo, usar el simulador local de HU-08 que se describe abajo.
+
+### Probar HU-08 con una cuenta ficticia
+
+El simulador sirve únicamente para probar el login en desarrollo. No es la API de FastAPI, no usa la BD del equipo y no valida roles ni permisos reales. Solo escucha en `127.0.0.1` y sus credenciales no sirven en Render.
+
+1. Desde la raíz del repositorio, con Node.js instalado, ejecutar:
+
+   ```powershell
+   node android/tools/login-test-server.mjs
+   ```
+
+2. Mantener ese proceso abierto. En `android/local.properties`, junto a `sdk.dir`, usar `API_BASE_URL=http://10.0.2.2:8000/`. El emulador usa esa dirección para llegar a la computadora.
+3. Ejecutar la configuración **app** en el emulador **Arete API 26 / 2 GB** de Android Studio. Los archivos se pueden editar en VS Code; es el mismo proyecto.
+4. Escribir `prueba@arete.local` y una contraseña incorrecta. Al tocar **Entrar**, debe aparecer **Usuario o contraseña incorrectos** y conservarse el correo.
+5. Cambiar la contraseña a `AretePrueba123!` y tocar **Entrar**. Debe abrirse la pantalla principal base de Arete.
+6. Quitar Arete de Recientes y abrirla otra vez: debe conservar la sesión. **Cerrar sesión** debe regresar al formulario.
+7. Probar campos vacíos, **Mostrar contraseña** y el botón de aceptar del teclado; el formulario se puede desplazar si el teclado ocupa espacio.
+
+Los tokens del simulador duran 30 segundos (acceso) y 10 minutos (renovación). Para probar un vencimiento más rápido, detener el servidor con Ctrl+C y, antes de iniciarlo de nuevo, establecer `$env:LOGIN_TEST_REFRESH_SECONDS = '20'`. Iniciar una sesión nueva y esperar 20 segundos: la app debe regresar al login. Para volver a la duración normal, quitar esa variable del proceso de PowerShell con `Remove-Item Env:LOGIN_TEST_REFRESH_SECONDS` y reiniciar el simulador.
+
+La configuración de red local solo se incluye en **debug** y permite HTTP únicamente hacia `10.0.2.2`, `127.0.0.1` y `localhost`. La app distribuible requiere HTTPS.
+
+**Pruebas automáticas:** desde `android/`, ejecutar `./gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest`. Las pruebas de interfaz y DataStore están en `app/src/androidTest`. Con el emulador ya arrancado, ejecutar `./gradlew.bat :app:connectedDebugAndroidTest`.
+
+Si el ejecutor de Android informa `INSTALL_FAILED_ALREADY_EXISTS`, no contar ese intento como aprobado aunque Gradle termine con `BUILD SUCCESSFUL`. Se puede instalar y ejecutar el mismo paquete de pruebas directamente:
+
+```powershell
+$adbArete = "$env:LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
+& $adbArete -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
+& $adbArete -s emulator-5554 install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+& $adbArete -s emulator-5554 shell am instrument -w -r com.arete.app.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Verificar primero el identificador del emulador con `adb devices` y cambiar `emulator-5554` si corresponde. El resultado válido debe indicar `OK (6 tests)` y ningún fallo. Las pruebas JVM incluyen 16 casos de HU-08 y el caso inicial del proyecto.
+
+**Pendiente de integración del equipo:** probar con una cuenta real contra la API desplegada y obtener el rol/permisos desde el servidor. En la base actual, `/auth/yo` devuelve solo `usuario_id` y la navegación tiene una pantalla principal común. Por ello, las pruebas locales no completan todavía el criterio de pantalla principal según rol ni la Definition of Done del equipo.
 
 ---
 
@@ -72,7 +108,7 @@ com.arete.app/
 Reglas clave:
 - **Las pantallas no llaman a Retrofit ni a Room.** Siempre pasan por un ViewModel y un Repository.
 - **Sin Hilt:** las dependencias se crean en `di/AppContainer.kt` y cada ViewModel tiene su `Factory`.
-- **Sesión:** el `AuthInterceptor` agrega `Authorization: Bearer <token>` a cada llamada. Si la API responde **401**, borra el token y `AreteNavHost` regresa solo al login. Las pantallas no tienen que hacer nada.
+- **Sesión:** DataStore guarda ambos tokens y su caducidad, sin contraseña. El `AuthInterceptor` renueva el acceso vencido antes de enviar una petición y agrega `Authorization: Bearer <token>`. Un **401** definitivo cierra la sesión y `AreteNavHost` regresa al login; un fallo temporal de conexión o del servidor durante la renovación conserva la sesión mientras el refresh siga vigente. Al vencer el refresh, la app vuelve al login incluso si no hace peticiones. La demo no envía credenciales a la API. Las pantallas no llaman directamente a la renovación.
 - **Nunca** escribas URLs, contraseñas ni tokens en el código.
 
 ---
