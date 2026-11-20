@@ -31,6 +31,7 @@ jobs:
           [ -z "$DATABASE_URL" ] && echo "::error::Falta el secreto NEON_BACKUP_URL" && faltan=1
           [ -z "$PASSPHRASE" ] && echo "::error::Falta el secreto BACKUP_PASSPHRASE" && faltan=1
           case "$DATABASE_URL" in *-pooler*) echo "::error::NEON_BACKUP_URL usa el pooler; usa la conexión directa" && faltan=1;; esac
+          case "$DATABASE_URL" in *://arete_api:*|*://arete_api@*) echo "::error::NEON_BACKUP_URL usa arete_api; el RLS dejaría el respaldo vacío. Usa el rol dueño" && faltan=1;; esac
           exit $faltan
 
       - name: Nombre del archivo
@@ -47,8 +48,16 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/out" "$PG_IMAGE" \
             pg_restore --list "/out/$ARCHIVO" > contenido.txt
-          echo "Tablas con datos: $(grep -c 'TABLE DATA' contenido.txt)"
-          test "$(grep -c 'TABLE DATA' contenido.txt)" -ge 30
+          tablas=$(grep -c 'TABLE DATA' contenido.txt)
+          echo "Tablas en el respaldo: $tablas"
+          test "$tablas" -ge 30
+
+          # raza nunca está vacía: la migración inicial siembra las razas.
+          razas=$(docker run --rm -v "$PWD:/out" "$PG_IMAGE" \
+            pg_restore --data-only --table=raza "/out/$ARCHIVO" \
+            | awk '/^COPY /{inside=1; next} /^\\\.$/{inside=0} inside' | wc -l)
+          echo "Filas en raza: $razas"
+          test "$razas" -ge 1
 
       - name: Cifrar con AES-256
         env:
