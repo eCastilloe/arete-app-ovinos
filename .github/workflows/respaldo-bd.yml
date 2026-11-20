@@ -4,7 +4,8 @@ on:
   schedule:
     - cron: "17 9 * * 0"   # domingos 9:17 UTC = 3:17 a. m. en Ciudad de México
   workflow_dispatch:        # botón para correrlo a mano
-  
+    push:
+      branches: [feature/HU-06-respaldo]   # TEMPORAL  
 
 permissions:
   contents: read
