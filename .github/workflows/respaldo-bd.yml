@@ -5,7 +5,7 @@ on:
     - cron: "17 9 * * 0"   # domingos 9:17 UTC = 3:17 a. m. en Ciudad de México
   workflow_dispatch:        # botón para correrlo a mano
   push:
-    branches: [feature/HU-06-respaldo]   # TEMPORAL  
+    branches: [feature/HU-06-respaldo] 
 
 permissions:
   contents: read
@@ -54,7 +54,7 @@ jobs:
 
           # raza nunca está vacía: la migración inicial siembra las razas.
           razas=$(docker run --rm -v "$PWD:/out" "$PG_IMAGE" \
-            pg_restore --data-only --table=raza "/out/$ARCHIVO" \
+            pg_restore --data-only --table=raza --file=- "/out/$ARCHIVO" \
             | awk '/^COPY /{inside=1; next} /^\\\.$/{inside=0} inside' | wc -l)
           echo "Filas en raza: $razas"
           test "$razas" -ge 1
