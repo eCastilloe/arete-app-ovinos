@@ -2,14 +2,21 @@ package com.arete.app.data.repository
 
 import com.arete.app.data.local.TokenStorage
 import com.arete.app.data.model.*
+import android.content.Context
+import java.io.File
 
 // This entire source set is excluded from release builds. No real ranch is changed.
 object InventoryRepositoryFactory {
-    fun create(tokenStorage: TokenStorage): InventoryRepository = InventoryRepository {
-        if (tokenStorage.getToken() != "demo-token") throw InventoryUnavailableException()
-        DemoInventoryData.snapshot()
-    }
+    fun create(context: Context, tokenStorage: TokenStorage): InventoryRepository = createDemoAnimals(context, tokenStorage)
 }
+
+object AnimalEditorRepositoryFactory {
+    fun create(context: Context, tokenStorage: TokenStorage): AnimalEditorRepository = createDemoAnimals(context, tokenStorage)
+}
+
+private fun createDemoAnimals(context: Context, tokens: TokenStorage) = DemoAnimalRepository(
+    File(context.filesDir, "hu19-demo/animals.json"), isDemoSession = { tokens.getToken() == "demo-token" }
+)
 
 object DemoInventoryData {
     const val RANCH_ID = "rancho-de-ejemplo"
