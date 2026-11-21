@@ -8,15 +8,27 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.arete.app.AreteApplication
 import com.arete.app.data.repository.AuthRepository
 import com.arete.app.data.repository.SyncRepository
+import com.arete.app.data.repository.TeamRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class HomeViewModel(
     private val authRepository: AuthRepository,
-    syncRepository: SyncRepository
+    syncRepository: SyncRepository,
+    val teamRepository: TeamRepository
 ) : ViewModel() {
+
+    val access = teamRepository.access
+    fun refreshAccess() { viewModelScope.launch {
+        try { withContext(Dispatchers.IO) { teamRepository.refreshAccess() } }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { /* Unknown permissions remain unavailable on the home screen. */ }
+    } }
 
     val pendingCount: StateFlow<Int> = syncRepository.pendingCount.stateIn(
         scope = viewModelScope,
@@ -34,7 +46,7 @@ class HomeViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as AreteApplication
-                HomeViewModel(app.container.authRepository, app.container.syncRepository)
+                HomeViewModel(app.container.authRepository, app.container.syncRepository, app.container.teamRepository)
             }
         }
     }
