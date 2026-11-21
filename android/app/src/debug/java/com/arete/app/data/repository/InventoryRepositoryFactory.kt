@@ -6,7 +6,7 @@ import com.arete.app.data.model.*
 // This entire source set is excluded from release builds. No real ranch is changed.
 object InventoryRepositoryFactory {
     fun create(tokenStorage: TokenStorage): InventoryRepository = InventoryRepository {
-        if (tokenStorage.getToken() != "demo-token") throw InventoryUnavailableException()
+        if (tokenStorage.getSession()?.isDemo != true) throw InventoryUnavailableException()
         DemoInventoryData.snapshot()
     }
 }

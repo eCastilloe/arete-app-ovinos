@@ -3,7 +3,7 @@ package com.arete.app.data.remote.dto
 import com.google.gson.annotations.SerializedName
 
 data class LoginRequest(
-    @SerializedName("correo") val email: String,
+    @SerializedName("email") val email: String,
     @SerializedName("password") val password: String
 )
 
@@ -12,3 +12,5 @@ data class LoginResponse(
     @SerializedName("refresh_token") val refreshToken: String?,
     @SerializedName("token_type") val tokenType: String
 )
+
+data class RefreshRequest(@SerializedName("refresh_token") val refreshToken: String)
