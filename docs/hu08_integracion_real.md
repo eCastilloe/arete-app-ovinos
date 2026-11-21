@@ -1,6 +1,9 @@
 # HU-08 — integración con la API real
 
-Revisión del 19 de noviembre de 2026. Trabajo local; no se publicó código ni se modificó Trello.
+La evidencia inicial corresponde al 19 de noviembre de 2026, cuando el trabajo
+era local. Al final se registra la publicación autorizada y las pruebas nuevas
+del 20 de noviembre; esas actualizaciones sustituyen los pendientes que señalan
+explícitamente como comprobados.
 
 ## Contexto y acuerdo recibido
 
@@ -85,3 +88,91 @@ Trello está En Progreso, con 3/4 criterios marcados y la caducidad natural del
 refresh pendiente. El PR debe permanecer en borrador hasta completar pendientes,
 demostración y revisión del equipo. Las pruebas descritas arriba corresponden
 al 19 de noviembre; preparar la entrega no equivale a repetir la prueba real.
+
+## Actualización real del 20 de noviembre: acceso corto y salida al login
+
+PR de esta entrega: [HU-08, #14](https://github.com/eCastilloe/arete-app-ovinos/pull/14).
+Permanece en borrador y depende de la base de Inventario del PR #15.
+
+El equipo comunicó acceso de 1 minuto (`expira_en: 60`) y refresh de 30 días.
+Se inició una sesión nueva en el emulador API 26 / 2 GB y se ejecutó
+`LiveSessionExpiryTest.accessExpiresAndAppRenewsTwiceWithoutReturningToLogin`:
+
+1. Login real de productor y pantalla Inventario visible.
+2. App al fondo y espera real de vencimiento, sin cambiar el reloj ni el token.
+3. Una petición directa con el acceso anterior recibió 401 de Render.
+4. Al reanudar la app, su validación renovó la sesión, guardó acceso y refresh
+   nuevos en DataStore y realizó una consulta autenticada correcta.
+5. Inventario siguió visible y no apareció el formulario de login.
+6. Se repitió el ciclo completo con el acceso recién renovado: también pasó.
+
+La primera versión de la prueba esperaba hasta `exp` según el reloj del emulador
+más dos segundos, pero el servidor aún respondió 200. Se corrigió la prueba para
+esperar la confirmación 401 del servidor mediante consultas de solo lectura,
+con un límite adicional de 65 segundos y un reloj monotónico para ese límite.
+Así no se supone que los relojes local y remoto coincidan exactamente. No se
+alteró el comportamiento de producción para hacer pasar la prueba.
+
+La aplicación renueva anticipadamente cuando detecta acceso caducado. Por tanto,
+el 401 del paso 3 es una comprobación directa del token anterior; no se afirma
+que la petición normal de la app tuviera que recibir primero ese 401. La ruta
+reactiva 401 → refresh → reintento también pasó en `LiveAuthTest` con ambas
+cuentas, usando firmas de acceso alteradas en sesiones de prueba aisladas.
+
+También pasó `rejectedRefreshClearsStoredSessionAndReturnsToLogin`: después de
+un login nuevo se alteraron únicamente las firmas de los tokens de la sesión
+de prueba local. El rechazo real de Render hizo que la app borrara la sesión
+en DataStore, retirara Inventario y mostrara «Entrar a tu rancho». No se cambió
+`JWT_SECRET`, no se modificaron animales y no se borraron datos del rancho.
+
+Resultados de esta actualización:
+
+- Compilación debug, APK de pruebas y Kotlin release: correctos. La tarea de
+  pruebas unitarias conservó sus resultados en verde (Gradle `UP-TO-DATE`).
+- Ejecución de regresión: `OK (14 tests)`, 146.758 s. Incluyó vencimiento natural
+  y dos renovaciones, `LiveAuthTest`, `TokenStorageTest`, `LoginScreenTest` e
+  `InventoryScreenTest`.
+- Prueba adicional de regreso al login por rechazo del refresh:
+  `OK (1 test)`, 6.264 s. Se añadió y ejecutó después de la suite anterior.
+- Registros locales ignorados por Git:
+  `android/.gradle/hu08-pr-expiry-instrumentation.log` y
+  `android/.gradle/hu08-pr-exit-instrumentation.log`. No imprimen tokens ni claves.
+
+### Cómo repetir las pruebas nuevas
+
+Compilar y ejecutar en un emulador con acceso a Internet y
+`API_BASE_URL=https://arete-api-90hx.onrender.com/` en `local.properties`
+(ignorado). `LiveSessionExpiryTest` se omite salvo que se habilite
+`liveShortExpiry=true` y se pasen `apiUrl`, `producerEmail` y
+`producerPassword` como argumentos locales del ejecutor. Para incluir
+`LiveAuthTest`, añadir `liveAuth=true`, `workerEmail` y `workerPassword`.
+Las cuentas y contraseñas se obtienen del equipo y no se incluyen en Git.
+
+Clases de la regresión, para el argumento `class` del ejecutor:
+
+```text
+com.arete.app.auth.LiveSessionExpiryTest
+com.arete.app.auth.LiveAuthTest
+com.arete.app.data.local.TokenStorageTest
+com.arete.app.ui.screens.login.LoginScreenTest
+com.arete.app.inventory.InventoryScreenTest
+```
+
+La prueba de acceso corto requiere mantener temporalmente ese ajuste en Render.
+La prueba de salida deja la app sin sesión. Las dos pruebas reemplazan solo la
+sesión local de autenticación; no deben ejecutarse sobre una sesión personal
+que se quiera conservar abierta.
+
+### Pendiente que requiere coordinación con el equipo
+
+El compañero ofreció rotar `JWT_SECRET` después de comprobar la renovación.
+Esa rotación aún no se ha realizado ni comprobado en esta entrega. Cuando el
+equipo la coordine, conservar una sesión obtenida antes de la rotación, esperar
+el vencimiento del acceso y volver a la app: el refresh anterior deberá recibir
+401 y la app deberá mostrar Login. La rotación invalida las sesiones existentes;
+corresponde al responsable de Render coordinarla.
+
+El refresh real sigue durando 30 días. No se afirma haber observado su caducidad
+natural. La persistencia y el regreso al login por rechazo ya tienen evidencia,
+pero el criterio completo de caducidad natural, la demostración y la revisión
+del equipo permanecen pendientes. Trello continúa En Progreso con 3/4 criterios.
