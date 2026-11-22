@@ -33,6 +33,12 @@ UNICOS = {
 @app.exception_handler(DBAPIError)
 async def errores_bd(request, exc):
     code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+    if code == "OV001" and request.url.path.startswith("/animales"):
+        # En la ficha, OV001 viene del candado de nacimiento de una cría, no de un parto.
+        return JSONResponse(status_code=403, content={
+            "codigo": code,
+            "detalle": "Los datos de nacimiento de esta cría están bloqueados; "
+                       "solo la Asociación puede corregirlos"})
     if code in OV:
         status, msg = OV[code]
         return JSONResponse(status_code=status, content={"codigo": code, "detalle": msg})
@@ -54,9 +60,6 @@ async def errores_bd(request, exc):
         return JSONResponse(status_code=422, content={
             "codigo": "CAMPO_OBLIGATORIO", "campo": getattr(diag, "column_name", None),
             "detalle": "Falta un campo obligatorio"})
-    if code == "OV001" and request.url.path.startswith("/animales"):
-        msg = ("Los datos de nacimiento de esta cría están bloqueados; "
-                   "solo la Asociación puede corregirlos")
     raise exc
 
 app.include_router(auth.router)

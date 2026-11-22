@@ -99,7 +99,7 @@ def d():
             INSERT INTO membresia_rancho (usuario_id, rancho_id, rol) VALUES
               (:prod1, :r1, 'productor'), (:enc1, :r1, 'encargado'), (:prod2, :r2, 'productor')
         """), {"prod1": prod1, "enc1": enc1, "prod2": prod2, "r1": r1, "r2": r2})
-    return {"r1": r1, "r2": r2, "h1": _headers(e_prod1), "h_enc": _headers(e_enc1),
+    return {"r1": r1, "r2": r2, "prod1": prod1, "h1": _headers(e_prod1), "h_enc": _headers(e_enc1),
             "h2": _headers(e_prod2)}
 
 
@@ -229,3 +229,48 @@ def test_buscar_trata_comodines_como_texto(d):  # revisión PR
     alta(d, folio="AX" + uuid.uuid4().hex[:4])
     r = client.get(f"{base}?buscar=A_", headers=d["h1"]).json()
     assert [x["folio"] for x in r["items"]] == [con_guion]
+
+
+
+def _cria_de_parto(d):
+    """Crea, como el productor de R1, un parto de hoy con una cría viva y su foto."""
+    with engine.begin() as conn:
+        conn.execute(text("SELECT set_config('app.usuario_id', :u, true)"), {"u": d["prod1"]})
+        p = {"r": d["r1"], "madre": str(uuid.uuid4()), "parto": str(uuid.uuid4()),
+             "cria": str(uuid.uuid4()), "fm": folio(), "fc": folio()}
+        p["ruta"] = f"pruebas/{p['parto']}.jpg"
+        conn.execute(text("""
+            INSERT INTO animal (id, rancho_id, folio, sexo, categoria, motivo_ingreso, fecha_nacimiento)
+            VALUES (:madre, :r, :fm, 'H', 'vientre', 'compra', '2022-01-01')"""), p)
+        conn.execute(text("""
+            INSERT INTO parto (id, rancho_id, madre_id, fecha_parto, crias_nacidas, crias_vivas, capturado_en)
+            VALUES (:parto, :r, :madre, current_date, 1, 1, now())"""), p)
+        conn.execute(text("""
+            INSERT INTO animal (id, rancho_id, folio, sexo, categoria, motivo_ingreso, fecha_nacimiento,
+                                madre_id, parto_origen_id, tipo_parto_nacimiento)
+            VALUES (:cria, :r, :fc, 'H', 'cria_lactante', 'nacimiento', current_date,
+                    :madre, :parto, 'simple')"""), p)
+        conn.execute(text("""
+            INSERT INTO parto_cria (rancho_id, parto_id, orden, sexo, nacio_vivo, cria_id)
+            VALUES (:r, :parto, 1, 'H', true, :cria)"""), p)
+        conn.execute(text("""
+            INSERT INTO foto_evidencia (rancho_id, parto_id, ruta, sha256, mime, bytes)
+            VALUES (:r, :parto, :ruta, repeat('a', 64), 'image/jpeg', 1000)"""), p)
+    return p["cria"]
+
+
+@bd
+def test_nacimiento_bloqueado_de_cria_da_403_con_mensaje(d):  # revisión PR: OV001 en /animales
+    cria = _cria_de_parto(d)
+    ficha = client.get(f"/animales/{cria}", headers=d["h1"]).json()
+    assert ficha["nacimiento_bloqueado"] is True
+    r = client.patch(f"/animales/{cria}",
+                     json={"version": ficha["version"], "fecha_nacimiento": "2024-01-01"},
+                     headers=d["h1"])
+    assert r.status_code == 403
+    assert r.json() == {"codigo": "OV001", "detalle": "Los datos de nacimiento de esta cría "
+                        "están bloqueados; solo la Asociación puede corregirlos"}
+    # lo que no es de nacimiento (p. ej. color) sí se puede editar
+    r = client.patch(f"/animales/{cria}", json={"version": ficha["version"], "color": "Pinta"},
+                     headers=d["h1"])
+    assert r.status_code == 200
