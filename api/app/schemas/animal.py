@@ -3,6 +3,7 @@ import re
 from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_core import PydanticCustomError
@@ -19,6 +20,13 @@ Metodo = Literal["MN", "IA", "TE"]
 
 # 484 + 7..12 dígitos = 10..15 dígitos en total (mismo CHECK que la BD, CA-05.3)
 SINIIGA_RE = re.compile(r"^484\d{7,12}$")
+
+# Render corre en UTC: después de las 18:00 de Jalisco, date.today() ya sería "mañana".
+ZONA = ZoneInfo("America/Mexico_City")
+
+
+def hoy_jalisco() -> date:
+    return datetime.now(ZONA).date()
 
 
 def _error(tipo: str, mensaje: str) -> PydanticCustomError:
@@ -72,7 +80,7 @@ class _CamposFicha(BaseModel):
     @field_validator("fecha_nacimiento")
     @classmethod
     def _no_futura(cls, v):
-        if v and v > date.today():
+        if v and v > hoy_jalisco():
             raise _error("fecha_futura", "La fecha de nacimiento no puede ser futura")
         return v
 
@@ -118,6 +126,14 @@ class AnimalActualizar(_CamposFicha):
     sexo: Sexo | None = None
     categoria: Categoria | None = None
     fecha_ingreso: date | None = None
+    
+    @model_validator(mode="after")
+    def _obligatorios_sin_null(self):
+        # Se pueden omitir, pero no mandar en null: en la BD son NOT NULL.
+        for campo in ("folio", "sexo", "categoria", "fecha_ingreso", "fecha_nacimiento_aprox"):
+            if campo in self.model_fields_set and getattr(self, campo) is None:
+                raise _error("obligatorio", f"El campo {campo} no puede quedar vacío")
+        return self
 
 
 class AnimalSalida(BaseModel):

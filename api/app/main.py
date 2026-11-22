@@ -50,6 +50,13 @@ async def errores_bd(request, exc):
         return JSONResponse(status_code=422, content={
             "codigo": "REFERENCIA_INVALIDA", "restriccion": restriccion,
             "detalle": "La raza o el progenitor no existe"})
+    if code == "23502":  # NOT NULL: un campo obligatorio llegó vacío
+        return JSONResponse(status_code=422, content={
+            "codigo": "CAMPO_OBLIGATORIO", "campo": getattr(diag, "column_name", None),
+            "detalle": "Falta un campo obligatorio"})
+    if code == "OV001" and request.url.path.startswith("/animales"):
+        msg = ("Los datos de nacimiento de esta cría están bloqueados; "
+                   "solo la Asociación puede corregirlos")
     raise exc
 
 app.include_router(auth.router)

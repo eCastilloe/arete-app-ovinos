@@ -57,7 +57,9 @@ APARTADOS = {
     "sementales": ("semental",),
     "crias": ("cria_lactante", "cordero_engorda", "cordera_recria"),
 }
-
+def _escapar_like(texto: str) -> str:
+    """Para que % y _ se busquen como texto y no como comodines de LIKE."""
+    return texto.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 def _ficha(conn, animal_id: UUID):
     """Con RLS, un animal de otro rancho simplemente no aparece → 404 (CA-04.3)."""
@@ -138,9 +140,10 @@ def listar_animales(
         filtros.append(" AND a.categoria = :categoria")
         params["categoria"] = categoria
     if buscar and buscar.strip():
-        filtros.append(" AND (a.folio ILIKE :buscar_folio OR a.siniiga LIKE :buscar_chip)")
-        params["buscar_folio"] = f"%{buscar.strip()}%"
-        params["buscar_chip"] = f"{buscar.strip()}%"
+        filtros.append(" AND (a.folio ILIKE :buscar_folio ESCAPE '\\' OR a.siniiga LIKE :buscar_chip ESCAPE '\\')")
+        b = _escapar_like(buscar.strip())
+        params["buscar_folio"] = f"%{b}%"
+        params["buscar_chip"] = f"{b}%"
     base = FICHA_SQL + "".join(filtros)
 
     total = conn.execute(text(f"SELECT count(*) FROM ({base}) t"), params).scalar_one()

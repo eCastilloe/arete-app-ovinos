@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 from app.db import engine
 from app.main import app
-from app.schemas.animal import AnimalCrear
+from app.schemas.animal import AnimalActualizar, AnimalCrear
 from app.seguridad import hashear_password
 
 client = TestClient(app)
@@ -60,7 +60,16 @@ def test_fecha_futura_se_rechaza():
     with pytest.raises(ValidationError, match="futura"):
         AnimalCrear(**hembra(fecha_nacimiento=str(date.today() + timedelta(days=1))))
 
+@pytest.mark.parametrize("campo", ["folio", "sexo", "categoria", "fecha_ingreso",
+                                   "fecha_nacimiento_aprox"])
+def test_patch_no_acepta_null_en_campos_obligatorios(campo):  # revisión PR: antes daba 500
+    with pytest.raises(ValidationError, match="no puede quedar vacío"):
+        AnimalActualizar(version=1, **{campo: None})
 
+
+def test_patch_permite_omitir_obligatorios_y_borrar_opcionales():
+    cambios = AnimalActualizar(version=1, madre_id=None).model_dump(exclude_unset=True)
+    assert cambios == {"version": 1, "madre_id": None}
 # ---------- Contra la BD ----------
 
 def _crear_usuario(conn, etiqueta):
@@ -204,3 +213,19 @@ def test_listado_filtra_pagina_y_busca(d):
     encontrado = client.get(f"{base}?buscar={f}", headers=d["h1"]).json()
     assert [x["folio"] for x in encontrado["items"]] == [f]
     assert client.get(f"{base}?situacion=bajas", headers=d["h1"]).json()["total"] == 0
+
+@bd
+def test_patch_con_null_obligatorio_da_422(d):  # revisión PR
+    a = alta(d).json()
+    r = client.patch(f"/animales/{a['id']}", json={"version": 1, "folio": None}, headers=d["h1"])
+    assert r.status_code == 422
+
+
+@bd
+def test_buscar_trata_comodines_como_texto(d):  # revisión PR
+    base = f"/ranchos/{d['r1']}/animales"
+    assert client.get(f"{base}?buscar=%25", headers=d["h1"]).json()["total"] == 0
+    con_guion = alta(d, folio="A_" + uuid.uuid4().hex[:4]).json()["folio"]
+    alta(d, folio="AX" + uuid.uuid4().hex[:4])
+    r = client.get(f"{base}?buscar=A_", headers=d["h1"]).json()
+    assert [x["folio"] for x in r["items"]] == [con_guion]
