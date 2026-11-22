@@ -50,35 +50,6 @@ async def errores_bd(request, exc):
         return JSONResponse(status_code=422, content={
             "codigo": "REFERENCIA_INVALIDA", "restriccion": restriccion,
             "detalle": "La raza o el progenitor no existe"})
-    raise exc# Índices únicos → campo del formulario y mensaje (HU-17, CA-05.2)
-UNICOS = {
-    "animal_folio_uq": ("folio", "Ya existe un animal con ese folio en este rancho"),
-    "animal_siniiga_uq": ("siniiga", "Ese chip SINIIGA ya está registrado"),
-    "animal_registro_uq": ("registro_uno", "Ese folio de registro ya está registrado"),
-    "animal_pkey": ("id", "Ya existe un animal con ese id"),
-}
-
-
-@app.exception_handler(DBAPIError)
-async def errores_bd(request, exc):
-    code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
-    if code in OV:
-        status, msg = OV[code]
-        return JSONResponse(status_code=status, content={"codigo": code, "detalle": msg})
-    diag = getattr(exc.orig, "diag", None)
-    restriccion = getattr(diag, "constraint_name", None)
-    if code == "23505":  # valor repetido
-        campo, msg = UNICOS.get(restriccion, (None, "El registro ya existe"))
-        return JSONResponse(status_code=409,
-                            content={"codigo": "DUPLICADO", "campo": campo, "detalle": msg})
-    if code == "23514":  # CHECK de la BD (categoría/sexo, estado reproductivo…)
-        return JSONResponse(status_code=422, content={
-            "codigo": "DATOS_INVALIDOS", "restriccion": restriccion,
-            "detalle": "Los datos no son coherentes (categoría, sexo o estado reproductivo)"})
-    if code == "23503":  # llave foránea: raza o progenitor que no existe
-        return JSONResponse(status_code=422, content={
-            "codigo": "REFERENCIA_INVALIDA", "restriccion": restriccion,
-            "detalle": "La raza o el progenitor no existe"})
     raise exc
 
 app.include_router(auth.router)
