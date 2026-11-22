@@ -19,7 +19,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arete.app.reader.ReaderState
 import com.arete.app.ui.components.AreteButton
 import com.arete.app.ui.components.AreteSecondaryButton
-import com.arete.app.ui.components.AreteButton
 import com.arete.app.ui.components.Sex
 import com.arete.app.ui.components.SexChip
 
