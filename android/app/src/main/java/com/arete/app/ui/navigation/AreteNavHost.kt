@@ -8,9 +8,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.arete.app.ui.screens.animal.AnimalDetailScreen
 import com.arete.app.ui.screens.home.HomeScreen
 import com.arete.app.ui.screens.login.LoginScreen
 import com.arete.app.ui.screens.inventory.InventoryScreen
@@ -32,17 +35,38 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
     NavHost(navController = navController, startDestination = startDestination) {
         composable(AppRoutes.LOGIN) { LoginScreen() }
         composable(AppRoutes.HOME) {
-            HomeScreen(onInventory = { navController.navigate(AppRoutes.INVENTORY) { launchSingleTop = true } })
+            HomeScreen(
+                onAnimalRead = { animalId ->
+                    navController.navigate(AppRoutes.animalDetail(animalId))
+                },
+                onInventory = { navController.navigate(AppRoutes.INVENTORY) { launchSingleTop = true } }
+            )
         }
         composable(AppRoutes.INVENTORY) {
             InventoryScreen(onHome = { navController.popBackStack(AppRoutes.HOME, false) })
         }
+        composable(
+            route = AppRoutes.ANIMAL_DETAIL,
+            arguments = listOf(navArgument(AppRoutes.ARG_ANIMAL_ID) { type = NavType.StringType })
+        ) { entry ->
+            AnimalDetailScreen(
+                animalId = entry.arguments?.getString(AppRoutes.ARG_ANIMAL_ID).orEmpty(),
+                onBack = { navController.popBackStack() }
+            )
+        }
     }
 
+    // Guardia de sesión: solo actúa si la pantalla actual no corresponde a la sesión.
+    // Con sesión, cualquier pantalla menos el login es válida (inicio, ficha, …).
     LaunchedEffect(isLoggedIn) {
-        val target = if (isLoggedIn) AppRoutes.HOME else AppRoutes.LOGIN
-        val current = navController.currentDestination?.route
-        if ((!isLoggedIn && current != AppRoutes.LOGIN) || (isLoggedIn && current == AppRoutes.LOGIN)) {
+        val currentRoute = navController.currentDestination?.route
+        val needsRedirect = if (isLoggedIn) {
+            currentRoute == AppRoutes.LOGIN
+        } else {
+            currentRoute != AppRoutes.LOGIN
+        }
+        if (needsRedirect) {
+            val target = if (isLoggedIn) AppRoutes.HOME else AppRoutes.LOGIN
             navController.navigate(target) {
                 popUpTo(navController.graph.id) { inclusive = true }
                 launchSingleTop = true
