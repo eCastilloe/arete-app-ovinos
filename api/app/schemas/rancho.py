@@ -23,7 +23,7 @@ class RanchoCrear(BaseModel):
     nombre: Nombre
     domicilio: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=250)]
     municipio: str | None = Field(default=None, max_length=120)
-    estado_mx: str = Field(default="Jalisco", max_length=60)
+    estado_mx: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=60)] = "Jalisco"
     clave_upp: str | None = Field(default=None, max_length=40)
     # Solo hace falta si el usuario pertenece a más de una asociación.
     asociacion_id: UUID | None = None
