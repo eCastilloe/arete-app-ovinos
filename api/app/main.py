@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from sqlalchemy import text
 from app.db import engine
-from app.routers import auth, animales, encargados
+from app.routers import auth, animales, encargados, partos
 
 app = FastAPI(title="Arete API", description="API del sistema de control de ranchos ovinos", version="0.1.0")
 from fastapi.responses import JSONResponse
@@ -9,7 +9,7 @@ from sqlalchemy.exc import DBAPIError
 
 OV = {
     "OV001": (403, "El parto está bloqueado y no se puede modificar"),
-    "OV002": (409, "Fuera de la ventana de registro; solicita el alta a la Asociación"),
+    "OV002": (409, "Fuera de la ventana de registro: solicita el alta a la Asociación"),
     "OV003": (422, "El número de crías no coincide"),
     "OV004": (422, "Falta la foto de evidencia"),
     "OV005": (422, "Los datos de una cría son inconsistentes"),
@@ -67,6 +67,7 @@ async def errores_bd(request, exc):
 app.include_router(auth.router)
 app.include_router(animales.router)
 app.include_router(encargados.router)
+app.include_router(partos.router)
 
 @app.get("/salud", tags=["Sistema"])
 def salud():
