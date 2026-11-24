@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from sqlalchemy import text
 from app.db import engine
-from app.routers import auth, animales
+from app.routers import auth, animales, ranchos
 
 app = FastAPI(title="Arete API", description="API del sistema de control de ranchos ovinos", version="0.1.0")
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DBAPIError
+app.include_router(ranchos.router)
 
 OV = {
     "OV001": (403, "El parto está bloqueado y no se puede modificar"),
@@ -27,6 +28,7 @@ UNICOS = {
     "animal_siniiga_uq": ("siniiga", "Ese chip SINIIGA ya está registrado"),
     "animal_registro_uq": ("registro_uno", "Ese folio de registro ya está registrado"),
     "animal_pkey": ("id", "Ya existe un animal con ese id"),
+    "usuario_email_uq": ("email", "Ya existe un usuario con ese correo"),
 }
 
 
