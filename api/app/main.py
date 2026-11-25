@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from sqlalchemy import text
 from app.db import engine
-from app.routers import auth, animales, encargados, partos, ranchos
+from app.routers import auth, animales, encargados, partos, ranchos, pesajes
 
 app = FastAPI(title="Arete API", description="API del sistema de control de ranchos ovinos", version="0.1.0")
 from fastapi.responses import JSONResponse
@@ -29,6 +29,10 @@ UNICOS = {
     "animal_pkey": ("id", "Ya existe un animal con ese id"),
     "usuario_email_uq": ("email", "Ya existe una cuenta con ese correo"),             # HU-11
     "membresia_rancho_uq": ("usuario_id", "Esa persona ya pertenece a este rancho"),  # HU-11
+    "pesaje_hito_uq": ("tipo", "Este animal ya tiene un pesaje de ese tipo"),         # HU-33
+    "pesaje_pkey": ("id", "Ya existe un pesaje con ese id"),                          # HU-33
+    "destete_cria_uq": ("cria_id", "Esta cría ya fue destetada"),                     # HU-33
+    "destete_pkey": ("id", "Ya existe un destete con ese id"),                        # HU-33
 }
 
 
@@ -69,6 +73,7 @@ app.include_router(animales.router)
 app.include_router(encargados.router)
 app.include_router(partos.router)
 app.include_router(ranchos.router)
+app.include_router(pesajes.router)
 
 @app.get("/salud", tags=["Sistema"])
 def salud():
