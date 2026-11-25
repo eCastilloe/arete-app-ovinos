@@ -6,7 +6,6 @@ from app.routers import auth, animales, ranchos
 app = FastAPI(title="Arete API", description="API del sistema de control de ranchos ovinos", version="0.1.0")
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DBAPIError
-app.include_router(ranchos.router)
 
 OV = {
     "OV001": (403, "El parto está bloqueado y no se puede modificar"),
@@ -66,6 +65,7 @@ async def errores_bd(request, exc):
 
 app.include_router(auth.router)
 app.include_router(animales.router)
+app.include_router(ranchos.router)
 
 @app.get("/salud", tags=["Sistema"])
 def salud():
