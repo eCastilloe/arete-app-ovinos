@@ -7,7 +7,6 @@ app = FastAPI(title="Arete API", description="API del sistema de control de ranc
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DBAPIError
 
-
 OV = {
     "OV001": (403, "El parto está bloqueado y no se puede modificar"),
     "OV002": (409, "Fuera de la ventana de registro: solicita el alta a la Asociación"),
@@ -28,12 +27,12 @@ UNICOS = {
     "animal_siniiga_uq": ("siniiga", "Ese chip SINIIGA ya está registrado"),
     "animal_registro_uq": ("registro_uno", "Ese folio de registro ya está registrado"),
     "animal_pkey": ("id", "Ya existe un animal con ese id"),
-    "usuario_email_uq": ("email", "Ese correo electrónico ya está registrado"),
-    "membresia_rancho_uq": ("rancho_id", "Esa persona ya pertenece a este rancho"),
-    "pesaje_hito_uq": ("tipo", "Este animal ya tiene un pesaje de ese tipo"),
-    "pesaje_pkey": ("id", "Ya existe un pesaje con ese id"),
-    "destete_cria_uq": ("cria_id", "Esta cría ya fue destetada"),
-    "destete_pkey": ("id", "Ya existe un destete con ese id"),
+    "usuario_email_uq": ("email", "Ya existe una cuenta con ese correo"),             # HU-11
+    "membresia_rancho_uq": ("usuario_id", "Esa persona ya pertenece a este rancho"),  # HU-11
+    "pesaje_hito_uq": ("tipo", "Este animal ya tiene un pesaje de ese tipo"),         # HU-33
+    "pesaje_pkey": ("id", "Ya existe un pesaje con ese id"),                          # HU-33
+    "destete_cria_uq": ("cria_id", "Esta cría ya fue destetada"),                     # HU-33
+    "destete_pkey": ("id", "Ya existe un destete con ese id"),                        # HU-33
 }
 
 
