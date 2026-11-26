@@ -17,7 +17,7 @@ from app.schemas.animal import hoy_jalisco
 from app.schemas.foto import FirmaEntrada
 from app.seguridad import usuario_actual_id
 from tests.utilidades import (bd, client, crear_animal, crear_encargado_directo,
-                              crear_rancho_con_productor, encabezados, ruta_existe)
+                              crear_rancho_con_productor, encabezados)
 
 CONTENIDO = b"\xff\xd8\xff\xe0" + os.urandom(2048)   # "JPEG" de prueba
 SHA = hashlib.sha256(CONTENIDO).hexdigest()
@@ -32,9 +32,13 @@ def firma(foto_id, rancho_id, parto_id, **cambios) -> dict:
 
 # ---------- Sin BD (corren en CI) ----------
 
-def test_rutas_registradas():
-    for ruta in ("/fotos/firma", "/fotos/{foto_id}/confirmar", "/fotos/{foto_id}/url"):
-        assert ruta_existe(ruta), ruta
+def test_rutas_documentadas_en_openapi():
+    # En FastAPI 0.163 app.routes ya no lista las rutas de los routers incluidos
+    # (aparecen como _IncludedRouter), así que se revisa el OpenAPI de /docs.
+    rutas = app.openapi()["paths"]
+    assert "post" in rutas["/fotos/firma"]
+    assert "post" in rutas["/fotos/{foto_id}/confirmar"]
+    assert "get" in rutas["/fotos/{foto_id}/url"]
 
 
 @pytest.mark.parametrize("cambio, campo", [
