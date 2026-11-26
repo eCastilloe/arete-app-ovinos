@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
                 AreteNavHost(isLoggedIn = isLoggedIn)
                 // HU-39: con sesión se revisan los avisos; al salir se quitan los del rancho.
                 when (isLoggedIn) {
-                    true -> NotificationPermissionRequest { AlertScheduler.runNow(this) }
+                    true -> NotificationPermissionRequest { granted -> if (granted) AlertScheduler.runNow(this) }
                     false -> LaunchedEffect(Unit) { container.alertRunner.clear() }
                     null -> Unit
                 }

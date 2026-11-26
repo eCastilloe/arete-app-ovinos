@@ -28,6 +28,14 @@ object AlertRules {
                 title = "Parto no registrado: revisar o avisar al veterinario",
                 body = "Folio ${birth.folio} · $window"
             )
+            // RF-21: la ventana ya empezó y todavía no termina. El texto no viene en el SRS;
+            // se tomó de la propuesta de la revisión de HU-39.
+            !today.isBefore(birth.windowStart) -> Alert(
+                AlertType.BIRTH_WINDOW_STARTED, birth.eventId, birth.eweId, birth.folio,
+                title = "Empieza la ventana de parto: folio ${birth.folio}",
+                body = "Puede parir entre el ${birth.windowStart.format(dayMonth)} y el " +
+                    "${birth.windowEnd.format(dayMonth)}; revisa el corral de parto"
+            )
             // CA-21.3: desde N días antes del inicio de la ventana, hasta que empieza.
             !today.isBefore(birth.windowStart.minusDays(settings.noticeDaysBeforeBirth.toLong())) &&
                 today.isBefore(birth.windowStart) -> Alert(

@@ -1,5 +1,8 @@
 package com.arete.app.alerts
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -74,11 +77,27 @@ class AlertRunnerTest {
         assertTrue("BIRTH_NOT_REGISTERED:evento-1" !in presenter.visible)
     }
 
-    @Test fun `quita el aviso de mover cuando empieza la ventana`() = runBlocking {
+    @Test fun `al empezar la ventana el aviso de mover se cambia por el de ventana`() = runBlocking {
         runner.run(at(LocalDate.of(2026, 11, 19)))
-        runner.run(at(LocalDate.of(2026, 11, 26)))
+        val shown = runner.run(at(LocalDate.of(2026, 11, 26)))
         assertTrue("MOVE_TO_BIRTH_PEN:evento-1" !in presenter.visible)
         assertTrue("MOVE_TO_BIRTH_PEN:evento-1" !in store.keys)
+        assertEquals(listOf("BIRTH_WINDOW_STARTED:evento-1"), shown.map { it.key })
+    }
+
+    @Test fun `cancelar el parto tambien quita el aviso de ventana`() = runBlocking {
+        runner.run(at(LocalDate.of(2026, 11, 27)))
+        assertTrue("BIRTH_WINDOW_STARTED:evento-1" in presenter.visible)
+        runner.cancelForBirth("evento-1")
+        assertTrue("BIRTH_WINDOW_STARTED:evento-1" !in presenter.visible)
+    }
+
+    @Test fun `dos recorridos al mismo tiempo no duplican avisos`() = runBlocking {
+        // La tarea diaria y la de inicio de sesión pueden coincidir.
+        val day = at(LocalDate.of(2026, 11, 19))
+        listOf(async(Dispatchers.Default) { runner.run(day) }, async(Dispatchers.Default) { runner.run(day) }).awaitAll()
+        assertEquals(1, presenter.shownCount["MOVE_TO_BIRTH_PEN:evento-1"])
+        assertEquals(1, presenter.shownCount["WEANING_DUE:cria-1"])
     }
 
     @Test fun `parto registrado cancela los avisos de esa gestacion`() = runBlocking {  // CA-21.4

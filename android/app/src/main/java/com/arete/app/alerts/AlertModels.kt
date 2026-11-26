@@ -40,6 +40,8 @@ data class SucklingLamb(
 
 enum class AlertType(val repeatsDaily: Boolean) {
     MOVE_TO_BIRTH_PEN(repeatsDaily = false),
+    // RF-21: aviso al inicio de la ventana de parto; dura mientras la ventana sigue abierta.
+    BIRTH_WINDOW_STARTED(repeatsDaily = false),
     // El más urgente: se repite una vez al día hasta que se registre el parto.
     BIRTH_NOT_REGISTERED(repeatsDaily = true),
     WEANING_DUE(repeatsDaily = false)

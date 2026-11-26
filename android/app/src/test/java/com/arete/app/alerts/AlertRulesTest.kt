@@ -38,9 +38,18 @@ class AlertRulesTest {
         assertEquals(AlertType.MOVE_TO_BIRTH_PEN, birthAlerts(LocalDate.of(2026, 11, 25)).single().type)
     }
 
-    @Test fun `dentro de la ventana no hay aviso de mover ni de atraso`() {
-        assertTrue(birthAlerts(LocalDate.of(2026, 11, 26)).isEmpty())
-        assertTrue(birthAlerts(LocalDate.of(2026, 11, 30)).isEmpty())
+    // ---------- Inicio de la ventana (RF-21) ----------
+
+    @Test fun `el 26 nov avisa que empezo la ventana de parto`() {
+        val alert = birthAlerts(LocalDate.of(2026, 11, 26)).single()
+        assertEquals(AlertType.BIRTH_WINDOW_STARTED, alert.type)
+        assertEquals("Empieza la ventana de parto: folio 287", alert.title)
+        assertEquals("Puede parir entre el 26/11 y el 30/11; revisa el corral de parto", alert.body)
+    }
+
+    @Test fun `el aviso de ventana dura hasta el ultimo dia de la ventana`() {
+        assertEquals(AlertType.BIRTH_WINDOW_STARTED, birthAlerts(LocalDate.of(2026, 11, 30)).single().type)
+        assertEquals(AlertType.BIRTH_NOT_REGISTERED, birthAlerts(LocalDate.of(2026, 12, 1)).single().type)
     }
 
     @Test fun `respeta los dias de aviso del rancho`() {
@@ -63,11 +72,10 @@ class AlertRulesTest {
     }
 
     @Test fun `los avisos de una gestacion comparten el evento para cancelarlos`() {
-        val move = birthAlerts(LocalDate.of(2026, 11, 19)).single()
-        val late = birthAlerts(LocalDate.of(2026, 12, 1)).single()
-        assertEquals("evento-1", move.sourceId)
-        assertEquals("evento-1", late.sourceId)
-        assertTrue(move.key != late.key)
+        val alerts = listOf(LocalDate.of(2026, 11, 19), LocalDate.of(2026, 11, 26), LocalDate.of(2026, 12, 1))
+            .map { birthAlerts(it).single() }
+        assertTrue(alerts.all { it.sourceId == "evento-1" })
+        assertEquals(3, alerts.map { it.key }.toSet().size)
     }
 
     // ---------- Destete (CA-11.1 a CA-11.3) ----------

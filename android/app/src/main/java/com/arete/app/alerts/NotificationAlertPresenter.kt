@@ -29,8 +29,10 @@ class NotificationAlertPresenter(context: Context) : AlertPresenter {
     override fun show(alert: Alert): Boolean {
         if (!canNotify()) return false
         // Tocar el aviso abre la app. Abrir "Confirmar destete" directo (CA-11.4) es de HU-35.
+        // Cada aviso lleva su propio requestCode para que, cuando lleve datos de su cría,
+        // FLAG_UPDATE_CURRENT no los reemplace por los del último aviso.
         val open = PendingIntent.getActivity(
-            context, 0,
+            context, alert.key.hashCode(),
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )

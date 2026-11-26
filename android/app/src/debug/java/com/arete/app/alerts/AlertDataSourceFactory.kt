@@ -23,6 +23,8 @@ object DemoAlerts {
             births = listOf(
                 // Su ventana empieza en 7 días → "Mover a corral de parto".
                 ExpectedBirth("demo-evento-1", "animal-0", "AIR-2253", today.plusDays(7), today.plusDays(11)),
+                // Su ventana empezó ayer → "Empieza la ventana de parto".
+                ExpectedBirth("demo-evento-3", "animal-2", "H-3", today.minusDays(1), today.plusDays(3)),
                 // Su ventana terminó hace 6 días → "Parto no registrado".
                 ExpectedBirth("demo-evento-2", "animal-1", "H-2", today.minusDays(10), today.minusDays(6))
             ),
