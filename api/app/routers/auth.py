@@ -8,6 +8,7 @@ from app.seguridad import (
     crear_access_token, crear_refresh_token, decodificar_token,
     no_autorizado, usuario_actual_id, verificar_password,
 )
+from app.schemas.usuario import YoSalida
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
@@ -49,6 +50,43 @@ def buscar_usuario_por_id(usuario_id: str) -> dict | None:
     return dict(fila) if fila else None
 
 
+# Debe dar los MISMOS permisos que validar_rancho (app/deps.py); si no, la app
+# mostraría botones que el servidor después rechaza con 403.
+RANCHOS_DEL_USUARIO_SQL = """
+WITH accesos AS (
+  SELECT m.rancho_id, m.rol, 'rancho' AS origen,
+         (m.rol = 'productor' OR m.puede_capturar) AS puede_capturar,
+         (m.rol = 'productor' OR m.puede_editar)   AS puede_editar,
+         (m.rol = 'productor' OR m.puede_exportar) AS puede_exportar
+    FROM membresia_rancho m
+   WHERE m.usuario_id = :u AND m.activo AND m.eliminado_en IS NULL
+  UNION ALL
+  SELECT r.id, ma.rol, 'asociacion', true, true, true
+    FROM membresia_asociacion ma
+    JOIN rancho r ON r.asociacion_id = ma.asociacion_id
+   WHERE ma.usuario_id = :u AND ma.activo
+)
+SELECT r.id AS rancho_id, r.nombre,
+       (array_agg(a.rol    ORDER BY a.origen = 'rancho' DESC))[1] AS rol,
+       (array_agg(a.origen ORDER BY a.origen = 'rancho' DESC))[1] AS origen,
+       bool_or(a.puede_capturar) AS puede_capturar,
+       bool_or(a.puede_editar)   AS puede_editar,
+       bool_or(a.puede_exportar) AS puede_exportar,
+       fn_es_autoridad(:u, r.id) AS puede_corregir
+  FROM accesos a
+  JOIN rancho r ON r.id = a.rancho_id
+ WHERE r.activo AND r.eliminado_en IS NULL
+ GROUP BY r.id, r.nombre
+ ORDER BY r.nombre
+"""
+
+
+def ranchos_del_usuario(usuario_id: str) -> list[dict]:
+    with engine.connect() as conn:
+        filas = conn.execute(text(RANCHOS_DEL_USUARIO_SQL), {"u": usuario_id}).mappings().all()
+    return [dict(f) for f in filas]
+
+
 def registrar_acceso(usuario_id: str) -> None:
     with engine.begin() as conn:
         conn.execute(text("SELECT set_config('app.usuario_id', :uid, true)"), {"uid": usuario_id})
@@ -83,7 +121,11 @@ def refresh(datos: RefreshEntrada):
     return _emitir_tokens(payload["sub"])
 
 
-@router.get("/yo")
+@router.get("/yo", response_model=YoSalida)
 def yo(usuario_id: str = Depends(usuario_actual_id)):
-    """Endpoint protegido de prueba: confirma que el token sirve."""
-    return {"usuario_id": usuario_id}
+    """Usuario en sesión y los ranchos a los que tiene acceso, con sus permisos.
+
+    Sirve solo para que la app muestre u oculte opciones: el servidor vuelve a
+    validar el rancho y el permiso en cada petición (RN-01).
+    """
+    return {"usuario_id": usuario_id, "ranchos": ranchos_del_usuario(usuario_id)}

@@ -1,0 +1,17 @@
+"""Tipos de entrada compartidos por los esquemas de altas de usuarios (HU-09, HU-11)."""
+from typing import Annotated
+
+from pydantic import StringConstraints
+
+# Mismo patrón que el CHECK de usuario.email en la BD.
+Correo = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        max_length=254,
+        pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+    ),
+]
+
+Nombre = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=120)]
+Password = Annotated[str, StringConstraints(min_length=8, max_length=128)]

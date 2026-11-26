@@ -43,3 +43,19 @@ def validar_rancho(conn, rancho_id: UUID, permiso: Permiso | None = None):
         """), {"r": rancho_id}).scalar()
         if not tiene:
             raise HTTPException(403, "No tienes permiso para esta acción")
+
+
+def validar_productor(conn, rancho_id: UUID):
+    """Solo el productor (dueño) del rancho administra su equipo (RF-04, SRS §2.3).
+
+    404 si no tiene acceso al rancho; 403 si tiene acceso pero no es el productor
+    (encargado, veterinario o técnico de la Asociación).
+    """
+    validar_rancho(conn, rancho_id)
+    es_productor = conn.execute(text("""
+        SELECT EXISTS (SELECT 1 FROM membresia_rancho
+          WHERE usuario_id = fn_usuario_actual() AND rancho_id = :r
+            AND rol = 'productor' AND activo AND eliminado_en IS NULL)
+    """), {"r": rancho_id}).scalar()
+    if not es_productor:
+        raise HTTPException(403, "Solo el productor del rancho puede administrar a su equipo")
