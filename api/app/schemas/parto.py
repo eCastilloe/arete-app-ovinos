@@ -1,4 +1,4 @@
-"""Esquemas del registro de partos (HU-24 · RF-06, RN-02 a RN-04)."""
+"""Esquemas del registro de partos (HU-24 · RF-06, RN-02 a RN-04) y alta extemporánea (HU-29)."""
 from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
@@ -112,7 +112,31 @@ class PartoResumen(BaseModel):
 class PartoSalida(PartoResumen):
     rancho_id: UUID
     evento_reproductivo_id: UUID | None
+    correccion_origen_id: UUID | None = None   # HU-29: corrección que autorizó el alta extemporánea
     bloqueado: bool                        # D-03: bloqueado desde que se guarda
     resumen: str
     crias: list[CriaSalida]
     fotos: list[FotoSalida]
+
+
+# ---------- HU-29 · Alta extemporánea (RF-07, RN-05, CA-07.3) ----------
+
+class AltaExtemporaneaCrear(PartoCrear):
+    """Mismos datos que un parto normal, más el motivo. Las fotos son la evidencia de la Asociación."""
+    motivo: str = Field(max_length=1000,
+                        description="Por qué se registra tarde (mínimo 10 caracteres)")
+
+    @field_validator("motivo")
+    @classmethod
+    def _motivo(cls, v):
+        v = v.strip()
+        if len(v) < 10:                                      # mismo mínimo que el CHECK de la BD
+            raise _error("motivo", "Escribe el motivo del alta extemporánea (mínimo 10 caracteres)")
+        return v
+
+
+class AltaExtemporaneaSalida(PartoSalida):
+    correccion_id: UUID
+    motivo: str
+    aprobada_por: UUID
+    aplicada_en: datetime
