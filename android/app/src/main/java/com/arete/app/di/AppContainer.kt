@@ -15,6 +15,10 @@ import com.arete.app.data.local.AppDatabase
 import com.arete.app.data.repository.AuthRepository
 import com.arete.app.data.repository.SyncRepository
 import com.arete.app.data.repository.InventoryRepositoryFactory
+import com.arete.app.alerts.AlertDataSourceFactory
+import com.arete.app.alerts.AlertRunner
+import com.arete.app.alerts.NotificationAlertPresenter
+import com.arete.app.alerts.PreferencesShownAlertStore
 import com.arete.app.reader.LectorArete
 import com.arete.app.reader.SimulatedLectorArete
 
@@ -62,4 +66,12 @@ class AppContainer(context: Context) {
     val inventoryRepository = InventoryRepositoryFactory.create(tokenStorage, apiService, authRepository)
     // HU-54 cambia solo esta línea por el lector NFC/QR real.
     val lectorArete: LectorArete = SimulatedLectorArete()
+
+    // HU-39: avisos locales de parto y destete.
+    val alertPresenter = NotificationAlertPresenter(context)
+    val alertRunner = AlertRunner(
+        AlertDataSourceFactory.create(tokenStorage),
+        PreferencesShownAlertStore(context),
+        alertPresenter
+    )
 }
