@@ -4,7 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import com.arete.app.alerts.AlertScheduler
+import com.arete.app.ui.components.NotificationPermissionRequest
 import androidx.compose.runtime.getValue
 import com.arete.app.ui.navigation.AreteNavHost
 import com.arete.app.ui.theme.AreteTheme
@@ -20,7 +23,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val authRepository = (application as AreteApplication).container.authRepository
+        val container = (application as AreteApplication).container
+        val authRepository = container.authRepository
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -34,6 +38,12 @@ class MainActivity : ComponentActivity() {
             AreteTheme {
                 val isLoggedIn by authRepository.isLoggedIn.collectAsState(initial = null)
                 AreteNavHost(isLoggedIn = isLoggedIn)
+                // HU-39: con sesión se revisan los avisos; al salir se quitan los del rancho.
+                when (isLoggedIn) {
+                    true -> NotificationPermissionRequest { AlertScheduler.runNow(this) }
+                    false -> LaunchedEffect(Unit) { container.alertRunner.clear() }
+                    null -> Unit
+                }
             }
         }
     }

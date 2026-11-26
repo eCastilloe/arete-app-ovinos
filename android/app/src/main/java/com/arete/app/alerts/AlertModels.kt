@@ -38,7 +38,12 @@ data class SucklingLamb(
     val isWeaned: Boolean
 )
 
-enum class AlertType { MOVE_TO_BIRTH_PEN, BIRTH_NOT_REGISTERED, WEANING_DUE }
+enum class AlertType(val repeatsDaily: Boolean) {
+    MOVE_TO_BIRTH_PEN(repeatsDaily = false),
+    // El más urgente: se repite una vez al día hasta que se registre el parto.
+    BIRTH_NOT_REGISTERED(repeatsDaily = true),
+    WEANING_DUE(repeatsDaily = false)
+}
 
 data class Alert(
     val type: AlertType,
