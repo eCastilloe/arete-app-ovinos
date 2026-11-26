@@ -30,7 +30,7 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
     }
 
     val navController = rememberNavController()
-    val startDestination = remember { if (isLoggedIn) AppRoutes.HOME else AppRoutes.LOGIN }
+    val startDestination = remember { if (isLoggedIn) AppRoutes.INVENTORY else AppRoutes.LOGIN }
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable(AppRoutes.LOGIN) { LoginScreen() }
@@ -43,7 +43,12 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
             )
         }
         composable(AppRoutes.INVENTORY) {
-            InventoryScreen(onHome = { navController.popBackStack(AppRoutes.HOME, false) })
+            InventoryScreen(onHome = {
+                navController.navigate(AppRoutes.HOME) {
+                    popUpTo(AppRoutes.INVENTORY) { inclusive = true }
+                    launchSingleTop = true
+                }
+            })
         }
         composable(
             route = AppRoutes.ANIMAL_DETAIL,
@@ -66,7 +71,7 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
             currentRoute != AppRoutes.LOGIN
         }
         if (needsRedirect) {
-            val target = if (isLoggedIn) AppRoutes.HOME else AppRoutes.LOGIN
+            val target = if (isLoggedIn) AppRoutes.INVENTORY else AppRoutes.LOGIN
             navController.navigate(target) {
                 popUpTo(navController.graph.id) { inclusive = true }
                 launchSingleTop = true

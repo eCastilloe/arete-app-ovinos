@@ -49,6 +49,10 @@ android {
         compose = true
         buildConfig = true
     }
+    installation {
+        // Reinstalar en el emulador conservando datos al repetir las pruebas.
+        installOptions.add("-r")
+    }
 }
 
 dependencies {
@@ -72,6 +76,8 @@ dependencies {
     implementation(libs.retrofit.converter.gson)
     implementation(libs.okhttp.logging)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

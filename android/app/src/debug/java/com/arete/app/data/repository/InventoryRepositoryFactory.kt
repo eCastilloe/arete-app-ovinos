@@ -6,10 +6,10 @@ import com.arete.app.data.remote.ApiService
 
 // This entire source set is excluded from release builds. No real ranch is changed.
 object InventoryRepositoryFactory {
-    fun create(tokenStorage: TokenStorage, apiService: ApiService): InventoryRepository {
-        val remote = RemoteInventoryRepository(apiService)
+    fun create(tokenStorage: TokenStorage, apiService: ApiService, authRepository: AuthRepository): InventoryRepository {
+        val remote = RemoteInventoryRepository(apiService, authRepository::getRanches)
         return InventoryRepository {
-            if (tokenStorage.getToken() == "demo-token") DemoInventoryData.snapshot() else remote.load()
+            if (tokenStorage.getSession()?.isDemo == true) DemoInventoryData.snapshot() else remote.load()
         }
     }
 }
