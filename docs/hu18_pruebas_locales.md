@@ -1,6 +1,6 @@
 # HU-18: inventario conectado a la API
 
-Revisión del 25 de noviembre de 2026 (America/Mexico_City).
+Revisión del 26 de noviembre de 2026 (America/Mexico_City).
 [PR #15](https://github.com/eCastilloe/arete-app-ovinos/pull/15) ·
 [Trello](https://trello.com/c/W3EBfmOu/20-hu-18-pantalla-de-inventario-por-apartados-5).
 Rama existente `codex/HU-18-inventario`; su renombrado se coordina con Emmanuel.
@@ -41,16 +41,50 @@ se integrarán con `AuthSession`. El DTO de `/auth/yo` ya incluye esos permisos.
 
 ## Evidencia ejecutada
 
+### Datos reales de prueba preparados el 26/11/2026
+
+Con autorización de Marvin se registraron, mediante la API de Render, 67 animales
+ficticios en **Rancho Demo** y dos pesajes. La consulta previa confirmó que estaba
+vacío. Todos llevan en observaciones `HU-18 prueba autorizada 2026-11-26;
+animales ficticios, no ganado real.` Se conservaron los UUID durante la carga
+para reanudarla sin duplicados; no se modificó ningún registro ajeno.
+
+| Registros | Folios / valores |
+|---|---|
+| 40 hembras activas | AIR-2253 y HU18-H002 a HU18-H040 |
+| 2 sementales activos | HU18-S001 y HU18-S002 |
+| 25 crías lactantes activas | HU18-C001 a HU18-C025 |
+| SINIIGA de prueba | 484000010000, de HU18-S001 |
+| Dos pesajes de control, 26/11/2026 | AIR-2253: 40 kg; HU18-H002: 60 kg |
+| Resultado independiente esperado | Hembras: (40 + 60) / 2 = **50.0 kg**, 2 de 40 pesadas |
+| Sin pesajes | Sementales y crías: «Peso promedio: sin pesajes» |
+
+AIR-2253 tiene raza null y estado `gestante`: debe mostrar «Sin raza»,
+«Gestante» y «40.0 kg». El resto de hembras también permite comprobar los cuatro
+estados del contrato. Los pesos faltantes no entran en el denominador.
+
+Los registros permanecen en el rancho compartido para repetir la demostración.
+Las pruebas instrumentadas solo los consultan; no repiten la carga ni crean bajas.
+
 | Comprobación | Resultado |
 |---|---|
 | Debug, APK de pruebas y Kotlin release | `BUILD SUCCESSFUL` |
-| Pruebas JVM | 24, cero fallos; incluye 8 nuevas del contrato remoto |
-| Emulador API 26 / 2048 MB | `OK (12 tests)`, 32.667 segundos |
-| Productor y encargado contra Render | Consulta correcta de Rancho Demo, vacío: 0/0/0, bajas 0 |
-| Navegación real | Búsqueda sin resultados, Limpiar, bajas vacías e Inicio correctos |
+| Pruebas JVM | 24, cero fallos; incluye 8 del contrato remoto. Gradle reutilizó el resultado válido porque no cambió código JVM |
+| Emulador API 26 / 2048 MB, ejecución final del 26/11 | `OK (12 tests)`, 44.636 segundos |
+| Productor y encargado contra Render | 40 hembras / 2 sementales / 25 crías, bajas 0 |
+| Promedio real de hembras | 50.0 kg; «Último pesaje de 2 de 40 animales»; sementales y crías sin pesajes |
+| Búsqueda real de AIR-2253 desde Crías | Productor 765 ms; encargado 440 ms; ≤1,000 ms, desde reemplazar el texto hasta recomposición y presencia de la fila |
+| Búsqueda real por SINIIGA | 484000010000 encuentra HU18-S001; teclado sin foco y captura estable |
+| Navegación real | Tres apartados, búsqueda sin resultados, Limpiar, bajas vacías e Inicio correctos |
 | Demo / regresión | 40/2/25, bajas, peso promedio, teclado, texto al 150 % y lector simulado |
-| Lista de 1,000 animales demo | Búsqueda y recomposición en 252 ms (límite: 1,000 ms) |
+| Lista de 1,000 animales demo | Búsqueda y recomposición en 214 ms (límite: 1,000 ms) |
 | Sin rancho / raza null | Mensaje sin inventario y «Sin raza»/«Gestante» comprobados en pantalla |
+
+Las 12 pruebas son 9 de `InventoryScreenTest` y 3 de `LiveInventoryTest`.
+La primera ejecución con los registros reales también pasó (37.399 s; búsquedas
+676/447 ms). Se repitió tras estabilizar las capturas del cierre del teclado.
+La medición local de 1,000 animales no se presenta como una prueba de 1,000
+registros remotos: en Render hay 67.
 
 La suite JVM prueba los códigos del servidor, la página completa, los parámetros
 de la petición, el primer rancho autorizado, sesión rechazada, rancho vacío,
@@ -59,10 +93,20 @@ controles de al menos 56 dp; el tema conserva textos de 16 sp o mayores.
 
 ### Capturas del emulador
 
-La primera captura es del servidor real; la segunda usa exclusivamente la demo.
-Los 40/2/25 de la demo no se atribuyen a Render.
+Estas capturas del 26/11 muestran animales ficticios persistidos en el servidor
+real, consultados por la app. Las dos primeras corresponden al productor; las
+otras dos, al encargado.
 
-![Inventario real: Rancho Demo vacío](evidence/hu18/real-empty.png)
+![Inventario real: 40/2/25 y promedio 50.0 kg](evidence/hu18/real-inventory.png)
+
+![AIR-2253 encontrado: Sin raza, Gestante, 40.0 kg](evidence/hu18/real-search.png)
+
+![Búsqueda real por SINIIGA con la cuenta de encargado](evidence/hu18/real-siniiga.png)
+
+![Bajas reales: cero; no sustituye una prueba con una baja existente](evidence/hu18/real-bajas.png)
+
+Evidencia histórica del 25/11: [Rancho Demo antes de la carga, vacío](evidence/hu18/real-empty.png).
+La demo local sigue siendo independiente de estos registros de Render:
 
 ![Inventario de demostración con 40/2/25](evidence/hu18/demo-inventory.png)
 
@@ -86,26 +130,36 @@ Los 40/2/25 de la demo no se atribuyen a Render.
    No guardar credenciales en scripts versionados, PRs ni capturas. La suite
    reemplaza la sesión local y termina sin sesión; no crea ni modifica animales.
    Las capturas quedan en los archivos externos de la app, carpeta `hu18-evidence`.
-5. Con un conjunto real 40/2/25 preparado, añadir `expectedCounts=40,2,25` para
-   exigir esos conteos. Las filas reales y su peso se contrastan con la API.
+5. Para exigir el conjunto de prueba preparado en Rancho Demo, añadir
+   `expectedCounts=40,2,25`, `expectedFemaleAverageKg=50`,
+   `expectedWeighedFemales=2`, `expectedFolio=AIR-2253` y
+   `expectedSiniiga=484000010000`. La prueba falla si faltan esos registros o si
+   los valores no coinciden. Visita cada apartado, compara el promedio, busca
+   AIR-2253 desde Crías y mide búsqueda/recomposición en ≤1 s. También busca el
+   SINIIGA, comprueba los mensajes sin resultados, limpia, abre Bajas y vuelve a
+   Inicio con las dos cuentas. Espera a que termine la actividad de interfaz
+   antes de tomar las capturas, incluido el cierre del teclado.
 6. Manualmente, Entrar en modo demo → Ver inventario. Buscar `air-2253` y
    `484000010000`; probar `zzzz`; Limpiar; Ver bajas; volver a activos; Inicio;
    Leer arete → ficha provisional → Volver.
 
 En esta máquina un init script ignorado en `.gradle` envía las salidas de build
 fuera de OneDrive; no es un requisito del código. Los logs locales de esta
-ejecución se guardan en `.gradle/hu18-live-build.log` y
-`.gradle/hu18-emulator-review.log` y no se publican.
+ejecución se guardan en `.gradle/hu18-seeded-build.log`,
+`.gradle/hu18-seeded-capture-build.log` y `.gradle/hu18-seeded-emulator-final.log`
+y no se publican. El manifiesto local de carga conserva IDs para evitar duplicados;
+no contiene credenciales y tampoco se versiona.
 
 ## Pendiente para cerrar la historia
 
-- Preparar datos reales de prueba: el Rancho Demo compartido está vacío. Falta
-  repetir en Render los conteos 40/2/25, encontrar AIR-2253, ver una baja existente
-  y comprobar un promedio con pesajes. Se solicitó a Marvin confirmar la creación
-  de 67 animales ficticios y dos pesajes; aún no se han creado.
 - La API disponible no expone una operación de baja. Para la prueba con una baja
   real se necesita un registro preparado por el equipo o la API de HU-21; no se
   modifica la BD directamente ni se implementa esa historia desde HU-18.
+- El caso con una baja existente (CA-16.3) sigue aprobado con datos locales,
+  pendiente contra Render. La carga real contiene únicamente los 67 activos
+  autorizados. El filtro real vacío sí se probó con ambos roles.
+- La consulta real con productor/encargado está validada; la matriz de aislamiento
+  con otro rancho y una cuenta sin acceso requiere los datos/cuentas del equipo.
 - Demostrar al Scrum Master, obtener revisión/aprobación y check `pytest (api)`
   en verde antes de fusionar. La tarjeta no está terminada.
 - Offline/sincronización, selector de rancho, ficha completa y demás módulos

@@ -2,6 +2,7 @@ package com.arete.app.inventory
 
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.unit.dp
@@ -52,6 +53,13 @@ class LiveInventoryTest {
             if (expectedCounts != null) {
                 assertEquals(expectedCounts, InventoryCategory.entries.map { expected.counts[it] })
             }
+            args.getString("expectedFemaleAverageKg")?.toDouble()?.let {
+                assertEquals(it, requireNotNull(expected.averageWeightKg), 0.001)
+            }
+            args.getString("expectedWeighedFemales")?.toInt()?.let {
+                assertEquals(it, expected.weighedCount)
+            }
+            var searchMillis: Long? = null
             ActivityScenario.launch(MainActivity::class.java).use {
                 compose.onNodeWithText("Leer arete").assertIsDisplayed().assertHeightIsAtLeast(56.dp)
                 compose.onNodeWithText("Ver inventario").assertHeightIsAtLeast(56.dp).performClick()
@@ -72,17 +80,61 @@ class LiveInventoryTest {
                 val average = expected.averageWeightKg?.let { String.format(java.util.Locale.US, "%.1f", it) }
                 compose.onNodeWithTag("average-weight").assertTextEquals(
                     if (average == null) "Peso promedio: sin pesajes" else "Peso promedio: $average kg")
+                if (expected.weighedCount > 0) {
+                    reveal("average-weight")
+                    compose.onNodeWithText("Último pesaje de ${expected.weighedCount} de ${expected.animals.size} animales")
+                        .assertExists()
+                }
+                capture("$account-average")
+
+                // Visit each real category and verify its list/average, including unweighed animals.
+                listOf(InventoryCategory.STUDS, InventoryCategory.YOUNG).forEach { category ->
+                    reveal("category-${category.name}")
+                    compose.onNodeWithTag("category-${category.name}").performClick()
+                    val categoryState = projectInventory(snapshot, InventoryFilters(category = category))
+                    reveal("inventory-result-count")
+                    compose.onNodeWithTag("inventory-result-count")
+                        .assertTextEquals("${category.label} · ${categoryState.animals.size}")
+                    reveal("average-weight")
+                    val categoryAverage = categoryState.averageWeightKg?.let { String.format(java.util.Locale.US, "%.1f", it) }
+                    compose.onNodeWithTag("average-weight").assertTextEquals(
+                        if (categoryAverage == null) "Peso promedio: sin pesajes" else "Peso promedio: $categoryAverage kg")
+                    capture("$account-${category.name.lowercase()}")
+                }
 
                 reveal("inventory-search")
-                val target = expected.animals.firstOrNull { it.folio == "AIR-2253" } ?: expected.animals.firstOrNull()
+                val requiredFolio = args.getString("expectedFolio")
+                val target = if (requiredFolio != null) {
+                    requireNotNull(expected.animals.firstOrNull { it.folio == requiredFolio }) { "Missing required live folio" }
+                } else expected.animals.firstOrNull { it.folio == "AIR-2253" } ?: expected.animals.firstOrNull()
                 if (target != null) {
+                    val start = SystemClock.elapsedRealtime()
                     compose.onNodeWithTag("inventory-search").performTextReplacement(target.folio.lowercase())
+                    compose.waitForIdle()
+                    compose.onNodeWithTag("animal-${target.id}").assertExists()
+                    searchMillis = SystemClock.elapsedRealtime() - start
+                    assertTrue("Live search/recomposition took $searchMillis ms", searchMillis <= 1_000)
                     compose.onNodeWithTag("inventory-search").performImeAction()
                     compose.onNodeWithTag("inventory-search").assertIsNotFocused()
                     reveal("animal-${target.id}")
                     compose.onNodeWithText(target.folio).assertIsDisplayed()
                     if (target.breed == null) compose.onNodeWithText("Sin raza").assertIsDisplayed()
+                    target.reproductiveState?.let { compose.onNodeWithText(it).assertIsDisplayed() }
+                    target.lastWeightKg?.let {
+                        compose.onNodeWithText(String.format(java.util.Locale.US, "%.1f kg", it)).assertIsDisplayed()
+                    }
                     capture("$account-search")
+                }
+                args.getString("expectedSiniiga")?.let { number ->
+                    val chipTarget = requireNotNull(snapshot.animals.firstOrNull { it.siniiga == number })
+                    reveal("inventory-search")
+                    compose.onNodeWithTag("inventory-search").performTextReplacement(number)
+                    compose.onNodeWithTag("inventory-search").performImeAction()
+                    compose.onNodeWithTag("inventory-search").assertIsNotFocused()
+                    reveal("animal-${chipTarget.id}")
+                    compose.onNodeWithText(chipTarget.folio).assertIsDisplayed()
+                    compose.onNodeWithText("SINIIGA $number").assertIsDisplayed()
+                    capture("$account-siniiga")
                 }
                 reveal("inventory-search")
                 compose.onNodeWithTag("inventory-search").performTextReplacement("HU18-SIN-COINCIDENCIAS")
@@ -103,7 +155,7 @@ class LiveInventoryTest {
                 capture("$account-home")
             }
             instrumentation.sendStatus(2, Bundle().apply {
-                putString("stream", "\nHU18 $account: real inventory OK; active counts=${InventoryCategory.entries.map { expected.counts[it] }}; bajas=${expected.dischargedCount}; weighed=${expected.weighedCount}; searchTarget=${targetAvailable(expected.animals.size)}.\n")
+                putString("stream", "\nHU18 $account: real inventory OK; active counts=${InventoryCategory.entries.map { expected.counts[it] }}; bajas=${expected.dischargedCount}; weighed=${expected.weighedCount}; averageKg=${expected.averageWeightKg}; searchMillis=$searchMillis; searchTarget=${targetAvailable(expected.animals.size)}.\n")
             })
         } finally {
             runBlocking { container.authRepository.logout() }
@@ -138,6 +190,8 @@ class LiveInventoryTest {
 
     private fun capture(name: String) {
         compose.waitForIdle()
+        // IME transitions run outside Compose; avoid capturing a keyboard mid-animation.
+        instrumentation.uiAutomation.waitForIdle(500, 5_000)
         val directory = File(instrumentation.targetContext.getExternalFilesDir(null), "hu18-evidence").apply { mkdirs() }
         val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
         try { File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
