@@ -7,15 +7,15 @@ from pydantic import BaseModel, Field
 
 from app.schemas.parto import Mime
 
-# Por ahora solo partos: su fila de foto la crea POST /ranchos/{id}/partos (HU-24).
-# Ficha (HU-19) y corrección (HU-28) se agregan cuando se acuerde quién crea su fila.
-Entidad = Literal["parto"]
+# parto: la fila la crea POST /ranchos/{id}/partos (HU-24); aquí solo se valida.
+# animal (ficha, HU-19) y correccion (HU-28): /fotos/firma crea la fila si no existe.
+Entidad = Literal["parto", "animal", "correccion"]
 EstadoSubida = Literal["pendiente", "subida", "fallida"]
 
 
 class FirmaEntrada(BaseModel):
-    foto_id: UUID                     # el mismo id que la app mandó al registrar el parto
-    rancho_id: UUID
+    """El rancho no viene aquí: sale de la entidad (patrón HU-10)."""
+    foto_id: UUID                     # lo genera la app al capturar; permite reintentar offline
     entidad: Entidad
     entidad_id: UUID
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")

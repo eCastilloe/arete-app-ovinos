@@ -34,6 +34,8 @@ UNICOS = {
     "pesaje_pkey": ("id", "Ya existe un pesaje con ese id"),                          # HU-33
     "destete_cria_uq": ("cria_id", "Esta cría ya fue destetada"),                     # HU-33
     "destete_pkey": ("id", "Ya existe un destete con ese id"),                        # HU-33
+    "foto_evidencia_pkey": ("foto_id", "Ya existe una foto con ese id"),             # HU-05
+    "foto_ruta_uq": ("foto_id", "Ya existe una foto en esa ruta"),                   # HU-05
 }
 
 
