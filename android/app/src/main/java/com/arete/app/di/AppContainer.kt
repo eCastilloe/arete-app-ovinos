@@ -32,7 +32,7 @@ class AppContainer(context: Context) {
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = if (BuildConfig.DEBUG) {
-            HttpLoggingInterceptor.Level.BODY
+            HttpLoggingInterceptor.Level.BASIC
         } else {
             HttpLoggingInterceptor.Level.NONE
         }
@@ -55,7 +55,7 @@ class AppContainer(context: Context) {
 
     val authRepository = AuthRepository(apiService, tokenStorage)
     val syncRepository = SyncRepository(database.pendingOperationDao())
-    val inventoryRepository = InventoryRepositoryFactory.create(tokenStorage)
+    val inventoryRepository = InventoryRepositoryFactory.create(tokenStorage, apiService)
     // HU-54 cambia solo esta línea por el lector NFC/QR real.
     val lectorArete: LectorArete = SimulatedLectorArete()
 }
