@@ -142,11 +142,12 @@ def firmar_subida(datos: FirmaEntrada, conn: DbUsuario, storage: Storage):
         return _conflicto("FOTO_YA_SUBIDA", "Esta foto ya se subió y no se puede reemplazar")
 
     # Con upsert, el reintento reescribe el mismo objeto (subida cortada, respuesta perdida
-    # o 'fallida'). Es seguro porque /confirmar vuelve a comprobar el hash.
+    # o 'fallida'). Es seguro porque /confirmar vuelve a comprobar el hash. El upsert queda
+    # dentro de la firma: probado con el bucket real, el x-upsert del PUT no cambia nada.
     url = storage.firmar_subida(foto["ruta"], reemplazar=True)
     return FirmaSalida(
         foto_id=foto["id"], url_subida=url,
-        encabezados={"content-type": foto["mime"], "x-upsert": "true"},
+        encabezados={"content-type": foto["mime"]},
         vence_en=datetime.now(timezone.utc) + VIGENCIA_SUBIDA,
     )
 

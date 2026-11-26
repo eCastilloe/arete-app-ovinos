@@ -27,7 +27,7 @@ class FirmaSalida(BaseModel):
     foto_id: UUID
     url_subida: str
     metodo: Literal["PUT"] = "PUT"
-    encabezados: dict[str, str]       # los que la app debe mandar en el PUT
+    encabezados: dict[str, str]       # los que la app debe mandar en el PUT (solo content-type)
     vence_en: datetime                # Supabase fija 2 horas; no se puede cambiar
 
 

@@ -158,7 +158,7 @@ def test_flujo_completo_firmar_subir_confirmar_y_ver(d):
     r = client.post("/fotos/firma", headers=d["h1"], json=firma(p["foto_id"], p["parto_id"]))
     assert r.status_code == 200, r.text
     assert r.json()["metodo"] == "PUT"
-    assert r.json()["encabezados"] == {"content-type": "image/jpeg", "x-upsert": "true"}
+    assert r.json()["encabezados"] == {"content-type": "image/jpeg"}
     assert p["ruta"] in r.json()["url_subida"]
     assert d["falso"].firmas[-1] == (p["ruta"], True)   # la ruta es la de la fila, con upsert
 
@@ -210,7 +210,8 @@ def test_hash_distinto_marca_fallida_y_permite_volver_a_subir(d):
     assert detalle["fotos"][0]["estado_subida"] == "fallida"
 
     r = client.post("/fotos/firma", headers=d["h1"], json=firma(p["foto_id"], p["parto_id"]))
-    assert r.status_code == 200 and r.json()["encabezados"]["x-upsert"] == "true"
+    assert r.status_code == 200
+    assert d["falso"].firmas[-1] == (p["ruta"], True)   # firmada con upsert: puede reescribir
 
     r = subir_y_confirmar(d, p["foto_id"], p["ruta"])   # mismos bytes que se capturaron
     assert r.status_code == 200 and r.json()["estado_subida"] == "subida"
