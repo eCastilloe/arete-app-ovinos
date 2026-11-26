@@ -14,6 +14,7 @@ import androidx.room.Room
 import com.arete.app.data.local.AppDatabase
 import com.arete.app.data.repository.AuthRepository
 import com.arete.app.data.repository.SyncRepository
+import com.arete.app.data.repository.InventoryRepositoryFactory
 import com.arete.app.reader.LectorArete
 import com.arete.app.reader.SimulatedLectorArete
 
@@ -31,29 +32,34 @@ class AppContainer(context: Context) {
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = if (BuildConfig.DEBUG) {
-            HttpLoggingInterceptor.Level.BODY
+            HttpLoggingInterceptor.Level.BASIC
         } else {
             HttpLoggingInterceptor.Level.NONE
         }
     }
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(AuthInterceptor(tokenStorage))
+    private val publicClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    val apiService: ApiService = Retrofit.Builder()
+    private fun createApi(client: OkHttpClient): ApiService = Retrofit.Builder()
         .baseUrl(BuildConfig.API_BASE_URL)
-        .client(okHttpClient)
+        .client(client)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
         .create(ApiService::class.java)
 
-    val authRepository = AuthRepository(apiService, tokenStorage)
+    private val authApi = createApi(publicClient)
+    private val authenticatedClient = publicClient.newBuilder()
+        .addInterceptor(AuthInterceptor(tokenStorage, authApi))
+        .build()
+    val apiService = createApi(authenticatedClient)
+    val authRepository = AuthRepository(authApi, tokenStorage, authenticatedApi = apiService)
     val syncRepository = SyncRepository(database.pendingOperationDao())
+    val inventoryRepository = InventoryRepositoryFactory.create(tokenStorage, apiService, authRepository)
     // HU-54 cambia solo esta línea por el lector NFC/QR real.
     val lectorArete: LectorArete = SimulatedLectorArete()
 }
