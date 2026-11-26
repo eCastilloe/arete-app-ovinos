@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from sqlalchemy import text
 from app.db import engine
-from app.routers import auth, animales, encargados, partos, ranchos, pesajes
+from app.almacenamiento import AlmacenamientoNoConfigurado, ErrorAlmacenamiento
+from app.routers import auth, animales, encargados, fotos, partos, ranchos, pesajes
 
 app = FastAPI(title="Arete API", description="API del sistema de control de ranchos ovinos", version="0.1.0")
 from fastapi.responses import JSONResponse
@@ -68,12 +69,28 @@ async def errores_bd(request, exc):
             "detalle": "Falta un campo obligatorio"})
     raise exc
 
+
+# HU-05: fallas de Supabase Storage. El mensaje nunca incluye la llave ni la respuesta.
+@app.exception_handler(AlmacenamientoNoConfigurado)
+async def almacenamiento_no_configurado(request, exc):
+    return JSONResponse(status_code=503, content={
+        "codigo": "ALMACENAMIENTO_NO_CONFIGURADO",
+        "detalle": "El almacenamiento de fotos no está configurado"})
+
+
+@app.exception_handler(ErrorAlmacenamiento)
+async def error_almacenamiento(request, exc):
+    return JSONResponse(status_code=502, content={
+        "codigo": "ALMACENAMIENTO_NO_DISPONIBLE",
+        "detalle": "No se pudo contactar el almacenamiento de fotos; inténtalo de nuevo"})
+
 app.include_router(auth.router)
 app.include_router(animales.router)
 app.include_router(encargados.router)
 app.include_router(partos.router)
 app.include_router(ranchos.router)
 app.include_router(pesajes.router)
+app.include_router(fotos.router)
 
 @app.get("/salud", tags=["Sistema"])
 def salud():
