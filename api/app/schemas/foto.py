@@ -37,6 +37,12 @@ class FotoEstado(BaseModel):
     subida_en: datetime | None
 
 
+class Conflicto(BaseModel):
+    """Forma de los 409, igual que los OVxxx: un código para la app y un texto para la persona."""
+    codigo: str
+    detalle: str
+
+
 class LecturaSalida(BaseModel):
     foto_id: UUID
     url: str

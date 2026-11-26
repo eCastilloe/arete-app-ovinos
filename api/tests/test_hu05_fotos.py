@@ -11,14 +11,15 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import text
 
-from app.almacenamiento import AlmacenamientoNoConfigurado, obtener_almacenamiento
+from app.almacenamiento import AlmacenamientoNoConfigurado, ObjetoYaExiste, obtener_almacenamiento
+from app.db import engine
 from app.deps import get_db_usuario
 from app.main import app
 from app.schemas.animal import hoy_jalisco
 from app.schemas.foto import FirmaEntrada
 from app.seguridad import usuario_actual_id
-from tests.utilidades import (bd, client, como, crear_animal, crear_encargado_directo,
-                              crear_rancho_con_productor, encabezados)
+from tests.utilidades import (bd, client, como, crear_animal, crear_asociacion_con_tecnico,
+                              crear_encargado_directo, crear_rancho_con_productor, encabezados)
 
 CONTENIDO = b"\xff\xd8\xff\xe0" + os.urandom(2048)   # "JPEG" de prueba
 SHA = hashlib.sha256(CONTENIDO).hexdigest()
@@ -39,6 +40,10 @@ def test_rutas_documentadas_en_openapi():
     assert "post" in rutas["/fotos/firma"]
     assert "post" in rutas["/fotos/{foto_id}/confirmar"]
     assert "get" in rutas["/fotos/{foto_id}/url"]
+    # Los 409 aparecen en /docs con sus códigos.
+    assert "CORRECCION_CERRADA" in rutas["/fotos/firma"]["post"]["responses"]["409"]["description"]
+    assert "409" in rutas["/fotos/{foto_id}/confirmar"]["post"]["responses"]
+    assert "409" in rutas["/fotos/{foto_id}/url"]["get"]["responses"]
 
 
 @pytest.mark.parametrize("cambio, campo", [
@@ -94,11 +99,18 @@ class StorageFalso:
 
     def __init__(self):
         self.objetos: dict[str, bytes] = {}
-        self.firmas: list[tuple[str, bool]] = []
+        self.firmas: list[str] = []
+        self.borrados: list[str] = []
 
-    def firmar_subida(self, ruta, reemplazar=False):
-        self.firmas.append((ruta, reemplazar))
+    def firmar_subida(self, ruta):
+        if ruta in self.objetos:          # sin upsert, igual que el bucket real
+            raise ObjetoYaExiste()
+        self.firmas.append(ruta)
         return f"https://falso.supabase.co/storage/v1/object/upload/sign/evidencias/{ruta}?token=t"
+
+    def borrar(self, ruta):
+        self.borrados.append(ruta)
+        self.objetos.pop(ruta, None)
 
     def huella(self, ruta):
         datos = self.objetos.get(ruta)
@@ -116,7 +128,12 @@ def d():
     r2 = crear_rancho_con_productor("R2 HU-05")
     _, e_sin_captura = crear_encargado_directo(r1["rancho_id"], puede_capturar=False)
     _, e_captura = crear_encargado_directo(r1["rancho_id"], puede_capturar=True, puede_editar=False)
-    yield {"falso": falso, "r1": r1["rancho_id"], "p1": r1["productor_id"],
+    # R1 queda afiliado a una asociación para poder resolver correcciones.
+    aso = crear_asociacion_con_tecnico("tecnico")
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE rancho SET asociacion_id = :a WHERE id = :r"),
+                     {"a": aso["asociacion_id"], "r": r1["rancho_id"]})
+    yield {"falso": falso, "r1": r1["rancho_id"], "p1": r1["productor_id"], "tecnico_id": aso["tecnico_id"],
            "h1": encabezados(r1["email"]), "h2": encabezados(r2["email"]),
            "h_sin_captura": encabezados(e_sin_captura), "h_captura": encabezados(e_captura)}
     app.dependency_overrides.pop(obtener_almacenamiento, None)
@@ -160,7 +177,7 @@ def test_flujo_completo_firmar_subir_confirmar_y_ver(d):
     assert r.json()["metodo"] == "PUT"
     assert r.json()["encabezados"] == {"content-type": "image/jpeg"}
     assert p["ruta"] in r.json()["url_subida"]
-    assert d["falso"].firmas[-1] == (p["ruta"], True)   # la ruta es la de la fila, con upsert
+    assert d["falso"].firmas[-1] == p["ruta"]           # la ruta es la de la fila
 
     r = subir_y_confirmar(d, p["foto_id"], p["ruta"])
     assert r.status_code == 200, r.text
@@ -192,6 +209,18 @@ def test_confirmar_es_idempotente_y_ya_no_se_puede_reemplazar(d):
 
 
 @bd
+def test_subida_que_llego_sin_confirmar_pide_confirmar(d):
+    # La subida llegó pero se perdió la respuesta (reintento offline, HU-44).
+    p = registrar_parto(d)
+    d["falso"].objetos[p["ruta"]] = CONTENIDO
+    r = client.post("/fotos/firma", headers=d["h1"], json=firma(p["foto_id"], p["parto_id"]))
+    assert r.status_code == 409 and r.json()["codigo"] == "FOTO_YA_RECIBIDA"
+
+    r = client.post(f"/fotos/{p['foto_id']}/confirmar", headers=d["h1"])
+    assert r.status_code == 200 and r.json()["estado_subida"] == "subida"
+
+
+@bd
 def test_confirmar_sin_subir_da_409(d):
     p = registrar_parto(d)
     r = client.post(f"/fotos/{p['foto_id']}/confirmar", headers=d["h1"])
@@ -199,11 +228,15 @@ def test_confirmar_sin_subir_da_409(d):
 
 
 @bd
-def test_hash_distinto_marca_fallida_y_permite_volver_a_subir(d):
+def test_hash_distinto_borra_el_objeto_y_permite_volver_a_subir(d):
     p = registrar_parto(d)
     d["falso"].objetos[p["ruta"]] = b"otra foto"
     r = client.post(f"/fotos/{p['foto_id']}/confirmar", headers=d["h1"])
     assert r.status_code == 409 and r.json()["codigo"] == "FOTO_NO_COINCIDE"
+
+    # Sin upsert, el objeto equivocado bloquearía el reintento: el servidor lo borra.
+    assert d["falso"].borrados[-1] == p["ruta"]
+    assert p["ruta"] not in d["falso"].objetos
 
     # 'fallida' quedó guardada (la respuesta 409 no deshace el UPDATE)
     detalle = client.get(f"/partos/{p['parto_id']}", headers=d["h1"]).json()
@@ -211,7 +244,7 @@ def test_hash_distinto_marca_fallida_y_permite_volver_a_subir(d):
 
     r = client.post("/fotos/firma", headers=d["h1"], json=firma(p["foto_id"], p["parto_id"]))
     assert r.status_code == 200
-    assert d["falso"].firmas[-1] == (p["ruta"], True)   # firmada con upsert: puede reescribir
+    assert d["falso"].firmas[-1] == p["ruta"]
 
     r = subir_y_confirmar(d, p["foto_id"], p["ruta"])   # mismos bytes que se capturaron
     assert r.status_code == 200 and r.json()["estado_subida"] == "subida"
@@ -288,7 +321,7 @@ def test_foto_de_ficha_se_crea_en_pendiente_y_es_idempotente(d):
     # Reintento offline (HU-44): misma petición → misma fila, sin duplicar.
     segundo = client.post("/fotos/firma", headers=d["h1"], json=firma(foto_id, animal, "animal"))
     assert segundo.status_code == 200
-    assert d["falso"].firmas[-1] == d["falso"].firmas[-2] == (ruta, True)
+    assert d["falso"].firmas[-1] == d["falso"].firmas[-2] == ruta
 
     # Con otro hash ya no cuadra: el primero quedó comprometido.
     r = client.post("/fotos/firma", headers=d["h1"], json=firma(foto_id, animal, "animal", sha256="1" * 64))
@@ -331,6 +364,26 @@ def test_foto_de_correccion_la_sube_el_productor(d):
     ruta = f"rancho/{d['r1']}/correcciones/{correccion}/{foto_id}.jpg"
     assert ruta in r.json()["url_subida"]
     assert subir_y_confirmar(d, foto_id, ruta).json()["estado_subida"] == "subida"
+
+
+@bd
+def test_correccion_resuelta_no_recibe_fotos_nuevas(d):
+    correccion = crear_correccion(d, registrar_parto(d)["parto_id"])
+    evidencia = uuid.uuid4()
+    assert client.post("/fotos/firma", headers=d["h1"],
+                       json=firma(evidencia, correccion, "correccion")).status_code == 200
+
+    # La Asociación aprueba (el trigger exige autoridad y que ya exista una foto).
+    with como(d["tecnico_id"]) as conn:
+        conn.execute(text("UPDATE correccion SET estado = 'aprobada' WHERE id = :c"), {"c": correccion})
+
+    r = client.post("/fotos/firma", headers=d["h1"], json=firma(uuid.uuid4(), correccion, "correccion"))
+    assert r.status_code == 409 and r.json()["codigo"] == "CORRECCION_CERRADA"
+
+    # La foto que ya estaba registrada sí se puede subir (así llega la evidencia del alta
+    # extemporánea, HU-29, cuya corrección se aplica en la misma transacción).
+    r = client.post("/fotos/firma", headers=d["h1"], json=firma(evidencia, correccion, "correccion"))
+    assert r.status_code == 200
 
 
 @bd

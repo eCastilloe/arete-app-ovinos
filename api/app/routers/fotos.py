@@ -12,8 +12,15 @@ Reglas acordadas con Felipe (26 nov):
   (productor del rancho o Asociación/Técnico, docs/03 §6).
 - La firma es idempotente: si la fila ya existe solo se valida. Se crea en 'pendiente' para
   animal y corrección; la foto de un parto solo nace con el parto (HU-24).
+- Una corrección que ya no está 'solicitada' no recibe fotos nuevas (CORRECCION_CERRADA).
+  Las que se registraron junto con ella, como las del alta extemporánea (HU-29), sí se suben.
 - El hash no cambia (fn_foto_inmutable): un reintento debe subir exactamente los mismos bytes,
   así que la app guarda el JPEG ya comprimido hasta que quede 'subida'.
+- La URL se firma sin upsert: un objeto que ya existe no se puede reescribir, ni siquiera con
+  una URL todavía vigente. Si la subida llegó pero la respuesta se perdió, el PUT del reintento
+  da 400 y una nueva firma da 409 FOTO_YA_RECIBIDA: lo que sigue es llamar a /confirmar.
+  Si el hash no coincide, el servidor borra el objeto y la foto queda 'fallida', lista para
+  volver a subirse.
 - Una vez 'subida' ya no se firma ni vuelve a otro estado.
 Los bytes van del celular al bucket sin pasar por Render. La API solo firma y verifica.
 """
@@ -25,9 +32,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.almacenamiento import LECTURA_SEGUNDOS, LIMITE_BYTES, Almacenamiento, obtener_almacenamiento
+from app.almacenamiento import (LECTURA_SEGUNDOS, LIMITE_BYTES, Almacenamiento, ObjetoYaExiste,
+                                obtener_almacenamiento)
 from app.deps import DbUsuario, validar_rancho
-from app.schemas.foto import FirmaEntrada, FirmaSalida, FotoEstado, LecturaSalida
+from app.schemas.foto import Conflicto, FirmaEntrada, FirmaSalida, FotoEstado, LecturaSalida
 
 router = APIRouter(tags=["Fotos"])
 Storage = Annotated[Almacenamiento, Depends(obtener_almacenamiento)]
@@ -48,6 +56,11 @@ SELECT id, rancho_id, parto_id, animal_id, correccion_id, ruta, sha256, mime, by
   FROM foto_evidencia
  WHERE id = :id AND eliminado_en IS NULL
 """
+
+
+def _conflictos(*codigos: str) -> dict:
+    """Respuestas 409 para /docs, con los códigos posibles de cada ruta."""
+    return {409: {"model": Conflicto, "description": "Códigos posibles: " + ", ".join(codigos)}}
 
 
 def _conflicto(codigo: str, detalle: str) -> JSONResponse:
@@ -105,12 +118,19 @@ def _validar_permiso(conn, entidad: str, rancho_id: UUID):
             raise HTTPException(403, "Solo el productor o la Asociación pueden solicitar correcciones")
 
 
+def _correccion_abierta(conn, correccion_id: UUID) -> bool:
+    estado = conn.execute(text("SELECT estado FROM correccion WHERE id = :id"), {"id": correccion_id}).scalar()
+    return estado == "solicitada"
+
+
 def _estado(foto: dict) -> FotoEstado:
     return FotoEstado(foto_id=foto["id"], estado_subida=foto["estado_subida"],
                       subida_en=foto["subida_en"])
 
 
 @router.post("/fotos/firma", response_model=FirmaSalida,
+             responses=_conflictos("FOTO_NO_COINCIDE", "FOTO_YA_SUBIDA", "FOTO_YA_RECIBIDA",
+                                   "CORRECCION_CERRADA"),
              summary="Pedir la URL para subir una foto de evidencia al bucket")
 def firmar_subida(datos: FirmaEntrada, conn: DbUsuario, storage: Storage):
     tabla, columna, carpeta = ENTIDADES[datos.entidad]
@@ -122,6 +142,9 @@ def firmar_subida(datos: FirmaEntrada, conn: DbUsuario, storage: Storage):
         if datos.entidad == "parto":
             # La foto de un parto solo nace dentro de la transacción de HU-24.
             raise HTTPException(404, "Foto no encontrada")
+        if datos.entidad == "correccion" and not _correccion_abierta(conn, datos.entidad_id):
+            return _conflicto("CORRECCION_CERRADA",
+                              "La corrección ya se resolvió; no se le pueden agregar fotos")
         conn.execute(text(f"""
             INSERT INTO foto_evidencia (id, rancho_id, {columna}, ruta, sha256, mime, bytes)
             VALUES (:id, :r, :entidad, :ruta, :sha, :mime, :bytes)
@@ -141,10 +164,12 @@ def firmar_subida(datos: FirmaEntrada, conn: DbUsuario, storage: Storage):
     if foto["estado_subida"] == "subida":
         return _conflicto("FOTO_YA_SUBIDA", "Esta foto ya se subió y no se puede reemplazar")
 
-    # Con upsert, el reintento reescribe el mismo objeto (subida cortada, respuesta perdida
-    # o 'fallida'). Es seguro porque /confirmar vuelve a comprobar el hash. El upsert queda
-    # dentro de la firma: probado con el bucket real, el x-upsert del PUT no cambia nada.
-    url = storage.firmar_subida(foto["ruta"], reemplazar=True)
+    try:
+        url = storage.firmar_subida(foto["ruta"])
+    except ObjetoYaExiste:
+        # La subida ya llegó (por ejemplo, se perdió la respuesta del PUT): falta confirmarla.
+        return _conflicto("FOTO_YA_RECIBIDA",
+                          "La foto ya está en el almacenamiento; falta confirmar la subida")
     return FirmaSalida(
         foto_id=foto["id"], url_subida=url,
         encabezados={"content-type": foto["mime"]},
@@ -153,6 +178,7 @@ def firmar_subida(datos: FirmaEntrada, conn: DbUsuario, storage: Storage):
 
 
 @router.post("/fotos/{foto_id}/confirmar", response_model=FotoEstado,
+             responses=_conflictos("FOTO_NO_RECIBIDA", "FOTO_NO_COINCIDE"),
              summary="Confirmar que la foto ya está en el bucket (tamaño y SHA-256)")
 def confirmar_subida(foto_id: UUID, conn: DbUsuario, storage: Storage):
     foto = _foto(conn, foto_id)
@@ -166,7 +192,9 @@ def confirmar_subida(foto_id: UUID, conn: DbUsuario, storage: Storage):
 
     tamano, sha = huella
     if tamano > LIMITE_BYTES or (tamano, sha) != (foto["bytes"], foto["sha256"]):
-        # Se guarda 'fallida' y se avisa; la app vuelve a subir los mismos bytes.
+        # Sin upsert, el objeto equivocado bloquearía el reintento: se borra y la foto queda
+        # 'fallida'. Si el borrado falla, la petición responde 502 y la foto sigue 'pendiente'.
+        storage.borrar(foto["ruta"])
         conn.execute(text("""UPDATE foto_evidencia SET estado_subida = 'fallida'
                               WHERE id = :id AND estado_subida <> 'subida'"""), {"id": foto_id})
         return _conflicto("FOTO_NO_COINCIDE",
@@ -181,6 +209,7 @@ def confirmar_subida(foto_id: UUID, conn: DbUsuario, storage: Storage):
 
 
 @router.get("/fotos/{foto_id}/url", response_model=LecturaSalida,
+            responses=_conflictos("FOTO_PENDIENTE"),
             summary="URL temporal (5 min) para ver una foto de evidencia")
 def url_lectura(foto_id: UUID, conn: DbUsuario, storage: Storage):
     foto = _foto(conn, foto_id)

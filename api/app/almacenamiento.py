@@ -29,6 +29,10 @@ class ErrorAlmacenamiento(Exception):
     """Supabase respondió con un error o no se pudo conectar."""
 
 
+class ObjetoYaExiste(Exception):
+    """El bucket ya tiene un objeto en esa ruta y, sin upsert, no lo deja reescribir."""
+
+
 class Almacenamiento:
     def __init__(self, url: str, llave: str, bucket: str,
                  transport: httpx.BaseTransport | None = None, timeout: float = 30.0):
@@ -37,12 +41,29 @@ class Almacenamiento:
         self._http = httpx.Client(base_url=self._base, headers={"apikey": llave},
                                   timeout=timeout, transport=transport)
 
-    def firmar_subida(self, ruta: str, reemplazar: bool = False) -> str:
-        """URL para que la app suba los bytes con PUT. Supabase la deja vigente 2 horas."""
-        encabezados = {"x-upsert": "true"} if reemplazar else {}
-        r = self._pedir("POST", f"/object/upload/sign/{self.bucket}/{ruta}",
-                        json={}, headers=encabezados)
+    def firmar_subida(self, ruta: str) -> str:
+        """URL para que la app suba los bytes con PUT. Supabase la deja vigente 2 horas.
+
+        Se firma sin upsert: si el objeto ya existe, el bucket rechaza la subida (400).
+        Así, una foto confirmada no se puede reemplazar aunque la URL siga vigente
+        (probado con el bucket real el 26 nov).
+
+        Si el objeto ya está en la ruta, Supabase ni siquiera firma: responde 400 con
+        code "KeyAlreadyExists", y aquí se convierte en ObjetoYaExiste.
+        """
+        try:
+            r = self._http.post(f"/object/upload/sign/{self.bucket}/{ruta}", json={})
+        except httpx.HTTPError as e:
+            raise ErrorAlmacenamiento("No se pudo conectar con el almacenamiento de fotos") from e
+        if r.status_code == 400 and self._codigo(r) == "KeyAlreadyExists":
+            raise ObjetoYaExiste()
+        self._revisar(r)
         return self._base + r.json()["url"]
+
+    def borrar(self, ruta: str) -> None:
+        """Quita un objeto que no coincidió con su hash, para que el reintento pueda subirlo
+        de nuevo. Solo el servidor puede hacerlo: usa la llave secreta."""
+        self._pedir("DELETE", f"/object/{self.bucket}", json={"prefixes": [ruta]})
 
     def huella(self, ruta: str) -> tuple[int, str] | None:
         """Descarga el objeto en memoria y regresa (tamaño, sha256).
@@ -77,6 +98,14 @@ class Almacenamiento:
             raise ErrorAlmacenamiento("No se pudo conectar con el almacenamiento de fotos") from e
         self._revisar(r)
         return r
+
+    @staticmethod
+    def _codigo(r: httpx.Response) -> str | None:
+        """El campo "code" del error de Supabase; el resto del cuerpo no se usa."""
+        try:
+            return r.json().get("code")
+        except ValueError:
+            return None
 
     @staticmethod
     def _revisar(r: httpx.Response):

@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from app import almacenamiento as alm
-from app.almacenamiento import Almacenamiento, ErrorAlmacenamiento, LIMITE_BYTES
+from app.almacenamiento import Almacenamiento, ErrorAlmacenamiento, LIMITE_BYTES, ObjetoYaExiste
 
 LLAVE = "sb_secret_solo-para-pruebas"
 RUTA = "rancho/r1/partos/p1/f1.jpg"
@@ -31,19 +31,42 @@ def test_firmar_subida_usa_apikey_y_devuelve_url_completa():
     assert req.url.path == f"/storage/v1/object/upload/sign/evidencias/{RUTA}"
     assert req.headers["apikey"] == LLAVE
     assert "authorization" not in req.headers          # la llave nueva no es un JWT
-    assert "x-upsert" not in req.headers                # por defecto no reemplaza
+    assert "x-upsert" not in req.headers                # sin upsert: una foto subida no se reescribe
     assert url == f"https://proyecto.supabase.co/storage/v1/object/upload/sign/evidencias/{RUTA}?token=abc"
 
 
-def test_firmar_subida_para_reemplazar_manda_x_upsert():
+def test_borrar_usa_la_llave_y_el_prefijo_del_objeto():
     vistos = []
 
     def manejador(req):
         vistos.append(req)
-        return httpx.Response(200, json={"url": "/object/upload/sign/x?token=t"})
+        return httpx.Response(200, json=[])
 
-    cliente(manejador).firmar_subida(RUTA, reemplazar=True)
-    assert vistos[0].headers["x-upsert"] == "true"
+    cliente(manejador).borrar(RUTA)
+    req = vistos[0]
+    assert req.method == "DELETE"
+    assert req.url.path == "/storage/v1/object/evidencias"
+    assert json.loads(req.content) == {"prefixes": [RUTA]}
+    assert req.headers["apikey"] == LLAVE
+
+
+def test_firmar_una_ruta_que_ya_existe_avisa_objeto_ya_existe():
+    # Respuesta real de Supabase al firmar sin upsert una ruta ocupada (26 nov).
+    cuerpo = {"statusCode": "409", "error": "Duplicate", "message": "The resource already exists",
+              "code": "KeyAlreadyExists"}
+    with pytest.raises(ObjetoYaExiste):
+        cliente(lambda req: httpx.Response(400, json=cuerpo)).firmar_subida(RUTA)
+
+
+def test_otro_400_al_firmar_sigue_siendo_error_de_almacenamiento():
+    cuerpo = {"statusCode": "404", "error": "Bucket not found", "code": "NoSuchBucket"}
+    with pytest.raises(ErrorAlmacenamiento):
+        cliente(lambda req: httpx.Response(400, json=cuerpo)).firmar_subida(RUTA)
+
+
+def test_error_al_borrar_es_error_de_almacenamiento():
+    with pytest.raises(ErrorAlmacenamiento):
+        cliente(lambda req: httpx.Response(500)).borrar(RUTA)
 
 
 def test_huella_calcula_tamano_y_sha256():
