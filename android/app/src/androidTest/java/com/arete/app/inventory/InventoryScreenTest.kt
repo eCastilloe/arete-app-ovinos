@@ -111,6 +111,22 @@ class InventoryScreenTest {
         compose.onNodeWithText("AIR-2253").assertDoesNotExist()
     }
 
+    @Test fun noAssignedRanchShowsMessageInsteadOfInventoryControls() {
+        open(InventoryRepository { throw NoAssignedRanchException() })
+        compose.onNodeWithText("No tienes ranchos asignados").assertIsDisplayed()
+        compose.onNodeWithTag("inventory-search").assertDoesNotExist()
+        compose.onNodeWithText("Rancho de ejemplo").assertDoesNotExist()
+    }
+
+    @Test fun missingBreedAndTranslatedPregnancyAreReadable() {
+        val snapshot = DemoInventoryData.snapshot()
+        open(InventoryRepository { snapshot.copy(isDemo = false,
+            animals = listOf(snapshot.animals.first().copy(breed = null, reproductiveState = "Gestante"))) })
+        reveal("animal-animal-0")
+        compose.onNodeWithText("Sin raza").assertIsDisplayed()
+        compose.onNodeWithText("Gestante").assertIsDisplayed()
+    }
+
     @Test fun savedSelectionAndLargeTextRemainUsable() {
         open(saved = SavedStateHandle(mapOf("category" to InventoryCategory.YOUNG.name)), fontScale = 1.5f)
         reveal("category-YOUNG")

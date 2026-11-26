@@ -12,6 +12,9 @@ import com.arete.app.data.model.InventoryCategory
 import com.arete.app.data.model.InventorySnapshot
 import com.arete.app.data.repository.InventoryRepository
 import com.arete.app.data.repository.InventoryUnavailableException
+import com.arete.app.data.repository.NoAssignedRanchException
+import com.arete.app.data.repository.IncompleteInventoryException
+import retrofit2.HttpException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,6 +50,16 @@ class InventoryViewModel(
                 projectInventory(result, filters)
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: NoAssignedRanchException) {
+                InventoryUiState(isLoading = false, filters = filters, error = "No tienes ranchos asignados")
+            } catch (e: IncompleteInventoryException) {
+                InventoryUiState(isLoading = false, filters = filters, error = "No pudimos cargar todos los animales de tu rancho. Intenta de nuevo más tarde.")
+            } catch (e: HttpException) {
+                InventoryUiState(isLoading = false, filters = filters, error = when (e.code()) {
+                    401 -> "Tu sesión venció. Vuelve a entrar."
+                    403, 404 -> "No tienes acceso al inventario de este rancho."
+                    else -> "No pudimos cargar el inventario. Intenta de nuevo más tarde."
+                })
             } catch (e: InventoryUnavailableException) {
                 InventoryUiState(isLoading = false, filters = filters, error = "El inventario de tu rancho aún no está disponible. Intenta de nuevo más tarde.")
             } catch (e: Exception) {
