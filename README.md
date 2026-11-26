@@ -44,7 +44,7 @@ El simulador sirve únicamente para probar el login en desarrollo. No es la API 
 2. Mantener ese proceso abierto. En `android/local.properties`, junto a `sdk.dir`, usar `API_BASE_URL=http://10.0.2.2:8000/`. El emulador usa esa dirección para llegar a la computadora.
 3. Ejecutar la configuración **app** en el emulador **Arete API 26 / 2 GB** de Android Studio. Los archivos se pueden editar en VS Code; es el mismo proyecto.
 4. Escribir `prueba@arete.local` y una contraseña incorrecta. Al tocar **Entrar**, debe aparecer **Usuario o contraseña incorrectos** y conservarse el correo.
-5. Cambiar la contraseña a `AretePrueba123!` y tocar **Entrar**. Debe abrirse la pantalla principal base de Arete.
+5. Cambiar la contraseña a `AretePrueba123!` y tocar **Entrar**. Debe abrirse Inventario con el aviso de usuario sin rancho: el simulador devuelve `ranchos: []` y no ofrece datos reales de animales.
 6. Quitar Arete de Recientes y abrirla otra vez: debe conservar la sesión. **Cerrar sesión** debe regresar al formulario.
 7. Probar campos vacíos, **Mostrar contraseña** y el botón de aceptar del teclado; el formulario se puede desplazar si el teclado ocupa espacio.
 
@@ -54,7 +54,7 @@ La configuración de red local solo se incluye en **debug** y permite HTTP únic
 
 **Pruebas automáticas:** desde `android/`, ejecutar `./gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest`. Las pruebas de interfaz y DataStore están en `app/src/androidTest`. Con el emulador ya arrancado, ejecutar `./gradlew.bat :app:connectedDebugAndroidTest`.
 
-Si el ejecutor de Android informa `INSTALL_FAILED_ALREADY_EXISTS`, no contar ese intento como aprobado aunque Gradle termine con `BUILD SUCCESSFUL`. Se puede instalar y ejecutar el mismo paquete de pruebas directamente:
+La configuración `installation.installOptions` incluye `-r` para repetir las pruebas conservando datos. Si el ejecutor de Android informa `INSTALL_FAILED_ALREADY_EXISTS`, no contar ese intento como aprobado aunque Gradle termine con `BUILD SUCCESSFUL`. Se puede instalar y ejecutar el mismo paquete de pruebas directamente:
 
 ```powershell
 $adbArete = "$env:LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
@@ -63,9 +63,9 @@ $adbArete = "$env:LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
 & $adbArete -s emulator-5554 shell am instrument -w -r com.arete.app.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-Verificar primero el identificador del emulador con `adb devices` y cambiar `emulator-5554` si corresponde. El resultado válido debe indicar `OK (6 tests)` y ningún fallo. Las pruebas JVM incluyen 16 casos de HU-08 y el caso inicial del proyecto.
+Verificar primero el identificador del emulador con `adb devices` y cambiar `emulator-5554` si corresponde. El resultado válido debe indicar `OK` y ningún fallo. Las pruebas contra Render son optativas y necesitan argumentos locales; una prueba omitida no cuenta como ejecutada.
 
-**Integración con Render (19 nov):** ya se probaron las dos cuentas reales de ejemplo del equipo. El acuerdo recibido es que productor y encargado llegan a Inventario en HU-08; los permisos detallados corresponden a HU-12. La rama `codex/HU-08-integracion` reúne HU-08 y HU-18 para comprobar esa navegación y se prepara como entrega en borrador. La lista real de animales depende de HU-17/HU-18. Sigue pendiente observar la caducidad natural con tiempos cortos confirmados: las respuestas verificadas aún entregan 60 minutos de acceso y 30 días de refresh. Consulta [la guía y evidencia](docs/hu08_integracion_real.md).
+**Integración con Render (26 nov):** productor y encargado entran a Inventario. HU-08 consulta `/auth/yo` después del login y al restaurar la sesión, y guarda los ranchos, roles y permisos en DataStore. Inventario utiliza esos ranchos autorizados. Se probaron ambas cuentas, reapertura y renovación con acceso de un minuto. El PR #14 tiene base `main`, que ya incluye HU-18; la administración de permisos corresponde a HU-12. No es necesario esperar 30 días ni rotar `JWT_SECRET` para cerrar el criterio de sesión. Consulta [la guía, evidencia y límites](docs/hu08_integracion_real.md).
 
 ---
 

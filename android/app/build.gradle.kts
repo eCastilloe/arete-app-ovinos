@@ -49,6 +49,10 @@ android {
         compose = true
         buildConfig = true
     }
+    installation {
+        // Reinstalar en el emulador conservando datos al repetir las pruebas.
+        installOptions.add("-r")
+    }
 }
 
 dependencies {

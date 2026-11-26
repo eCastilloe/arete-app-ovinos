@@ -50,7 +50,7 @@ const server = http.createServer(async (request, response) => {
     if (request.method === 'GET' && request.url === '/auth/yo') {
       const bearer = request.headers.authorization?.replace(/^Bearer /, '');
       return verify(bearer, 'access')
-        ? reply(response, 200, { usuario_id: 'usuario-ficticio-hu08' })
+        ? reply(response, 200, { usuario_id: 'usuario-ficticio-hu08', ranchos: [] })
         : reply(response, 401, { detail: 'Token inválido o expirado' });
     }
     if (request.method !== 'POST' || !['/auth/login', '/auth/refresh'].includes(request.url)) {

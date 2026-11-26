@@ -5,6 +5,8 @@ import com.arete.app.data.local.AuthSession
 import com.arete.app.data.local.SessionStore
 import com.arete.app.data.remote.ApiService
 import com.arete.app.data.remote.dto.LoginRequest
+import com.arete.app.data.remote.dto.RanchAccessDto
+import retrofit2.HttpException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -34,7 +36,11 @@ class AuthRepository(
     suspend fun login(email: String, password: String): Result<Unit> = try {
         val previous = sessionStore.getSession()
         val response = apiService.login(LoginRequest(email.trim(), password))
-        val session = AuthSession.fromResponse(response, now())
+        val tokens = AuthSession.fromResponse(response, now())
+        // Cliente público: usa el token recién recibido, sin publicar una sesión incompleta.
+        val userResponse = apiService.getCurrentUser("Bearer " + tokens.accessToken)
+        if (!userResponse.isSuccessful) throw HttpException(userResponse)
+        val session = tokens.withUser(requireNotNull(userResponse.body()))
         check(sessionStore.compareAndSet(previous, session))
         Result.success(Unit)
     } catch (e: CancellationException) {
@@ -50,14 +56,26 @@ class AuthRepository(
 
     suspend fun logout() = sessionStore.saveSession(null)
 
+    suspend fun getRanches(): List<RanchAccessDto> {
+        if (sessionStore.getSession()?.userId == null) validateSession().getOrThrow()
+        val session = requireNotNull(sessionStore.getSession())
+        check(!session.isDemo && session.isValid(now()) && session.userId != null)
+        return session.ranches
+    }
+
     // Al volver a la app se comprueba la sesión; sin red se conserva hasta que expire.
     suspend fun validateSession(): Result<Unit> = try {
         val session = sessionStore.getSession()
         if (session != null && !session.isDemo) {
             val response = authenticatedApi.getCurrentUser()
-            if (!response.isSuccessful) {
-                response.errorBody()?.close()
-                throw java.io.IOException("No se pudo comprobar la sesión.")
+            if (!response.isSuccessful) throw HttpException(response)
+            val user = requireNotNull(response.body())
+            while (true) {
+                val current = sessionStore.getSession()
+                // Un cierre u otro login no puede recibir los permisos de una petición anterior.
+                check(current != null && current.sessionId == session.sessionId)
+                val updated = current.withUser(user)
+                if (sessionStore.compareAndSet(current, updated)) break
             }
         }
         Result.success(Unit)

@@ -28,7 +28,7 @@ data class InventoryAnimal(
     val sex: AnimalSex,
     val category: AnimalCategory,
     val situation: AnimalSituation = AnimalSituation.ACTIVE,
-    val breed: String,
+    val breed: String?,
     val reproductiveState: String? = null,
     val lastWeightKg: Double? = null,
     val isExternal: Boolean = false,

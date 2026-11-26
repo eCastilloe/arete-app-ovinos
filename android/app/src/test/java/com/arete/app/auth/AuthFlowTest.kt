@@ -42,6 +42,7 @@ class AuthFlowTest {
 
     @Test fun loginUsesEmailContractAndRestoresSession() = runBlocking {
         server.enqueue(json(testResponse()))
+        server.enqueue(json(testUser()))
         val repository = AuthRepository(publicApi, sessions, clock)
         assertTrue(repository.login("  prueba@example.test  ", "test password").isSuccess)
         val request = server.takeRequest()
@@ -52,6 +53,86 @@ class AuthFlowTest {
         assertNull(request.getHeader("Authorization"))
         assertEquals(testResponse().refreshToken, sessions.getSession()?.refreshToken)
         assertTrue(AuthRepository(publicApi, sessions, clock).isLoggedIn.first())
+        val profileRequest = server.takeRequest()
+        assertEquals("/auth/yo", profileRequest.path)
+        assertEquals("Bearer " + testResponse().accessToken, profileRequest.getHeader("Authorization"))
+        assertEquals(testUser().ranches, sessions.getSession()?.ranches)
+        assertEquals("test-user", sessions.getSession()?.userId)
+    }
+
+    @Test fun failedOrMalformedProfileDoesNotPublishPartialLogin() = runBlocking {
+        for (profile in listOf(MockResponse().setResponseCode(503), json(mapOf("usuario_id" to "test-user")),
+            json(testUser().copy(userId = "another-user")))) {
+            server.enqueue(json(testResponse()))
+            server.enqueue(profile)
+            assertTrue(AuthRepository(publicApi, sessions, clock).login("a@b.test", "test").isFailure)
+            assertNull(sessions.getSession())
+        }
+    }
+
+    @Test fun userWithoutRanchesCanLoginWithoutInventedPermissions() = runBlocking {
+        server.enqueue(json(testResponse()))
+        server.enqueue(json(testUser().copy(ranches = emptyList())))
+        val repository = AuthRepository(publicApi, sessions, clock)
+        assertTrue(repository.login("a@b.test", "test").isSuccess)
+        assertTrue(repository.getRanches().isEmpty())
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test fun restorationReplacesCachedPermissionsAndInventoryReadsThemWithoutAnotherRequest() = runBlocking {
+        sessions.saveSession(testSession().withUser(testUser()))
+        server.enqueue(json(testUser(canEdit = false)))
+        val repository = AuthRepository(publicApi, sessions, clock, privateApi())
+        assertTrue(repository.validateSession().isSuccess)
+        assertFalse(repository.getRanches().first().canEdit)
+        assertEquals(testUser(false).ranches, sessions.getSession()?.ranches)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test fun restorationCanRenewThenSaveProfileOnTheRenewedSession() = runBlocking {
+        val previous = testSession(accessExpiry = TEST_NOW - 1000).withUser(testUser())
+        sessions.saveSession(previous)
+        server.enqueue(json(testResponse("restored")))
+        server.enqueue(json(testUser(false)))
+        assertTrue(AuthRepository(publicApi, sessions, clock, privateApi()).validateSession().isSuccess)
+        assertEquals(testResponse("restored").accessToken, sessions.getSession()?.accessToken)
+        assertEquals(previous.sessionId, sessions.getSession()?.sessionId)
+        assertEquals(testUser(false).ranches, sessions.getSession()?.ranches)
+    }
+
+    @Test fun temporaryRestorationFailureKeepsCachedSessionAndPermissions() = runBlocking {
+        val original = testSession().withUser(testUser())
+        sessions.saveSession(original)
+        server.enqueue(MockResponse().setResponseCode(503))
+        assertTrue(AuthRepository(publicApi, sessions, clock, privateApi()).validateSession().isFailure)
+        assertEquals(original, sessions.getSession())
+    }
+
+    @Test fun lateProfileCannotRestoreLogoutOrOverwriteAnotherLogin() = runBlocking {
+        val repository = AuthRepository(publicApi, sessions, clock, privateApi())
+        for (replacement in listOf(null, testSession().withUser(testUser(false)))) {
+            sessions.saveSession(testSession().withUser(testUser()))
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    runBlocking { sessions.saveSession(replacement) }
+                    return json(testUser())
+                }
+            }
+            assertTrue(repository.validateSession().isFailure)
+            assertEquals(replacement, sessions.getSession())
+        }
+    }
+
+    @Test fun refreshPreservesRanchesAndLogoutClearsTheWholeSession() = runBlocking {
+        val previous = testSession(accessExpiry = TEST_NOW - 1000).withUser(testUser())
+        sessions.saveSession(previous)
+        server.enqueue(json(testResponse("renewed")))
+        server.enqueue(json(mapOf("ok" to true)))
+        assertTrue(privateApi().getHealth().isSuccessful)
+        assertEquals(previous.ranches, sessions.getSession()?.ranches)
+        assertEquals(previous.sessionId, sessions.getSession()?.sessionId)
+        AuthRepository(publicApi, sessions, clock).logout()
+        assertNull(sessions.getSession())
     }
 
     @Test fun incorrectPasswordDoesNotCreateSession() = runBlocking {

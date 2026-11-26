@@ -2,12 +2,15 @@ package com.arete.app.data.repository
 
 import com.arete.app.data.local.TokenStorage
 import com.arete.app.data.model.*
+import com.arete.app.data.remote.ApiService
 
 // This entire source set is excluded from release builds. No real ranch is changed.
 object InventoryRepositoryFactory {
-    fun create(tokenStorage: TokenStorage): InventoryRepository = InventoryRepository {
-        if (tokenStorage.getSession()?.isDemo != true) throw InventoryUnavailableException()
-        DemoInventoryData.snapshot()
+    fun create(tokenStorage: TokenStorage, apiService: ApiService, authRepository: AuthRepository): InventoryRepository {
+        val remote = RemoteInventoryRepository(apiService, authRepository::getRanches)
+        return InventoryRepository {
+            if (tokenStorage.getSession()?.isDemo == true) DemoInventoryData.snapshot() else remote.load()
+        }
     }
 }
 
@@ -20,7 +23,7 @@ object DemoInventoryData {
             repeat(sizes[0]) { index ->
                 add(animal(index, AnimalCategory.EWE).copy(
                     folio = if (index == 0) "AIR-2253" else "H-${index + 1}",
-                    reproductiveState = listOf("Mantenimiento", "Gestante", "En lactancia", "En empadre")[index % 4],
+                    reproductiveState = listOf("Vacía", "Gestante", "Lactando", "En empadre")[index % 4],
                     lastWeightKg = if (index % 5 == 4) null else 40.0 + index % 11
                 ))
             }

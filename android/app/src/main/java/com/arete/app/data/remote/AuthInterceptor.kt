@@ -73,7 +73,12 @@ class AuthInterceptor(
             throw IOException("No se pudo renovar la sesión.")
         }
         val replacement = try {
-            AuthSession.fromResponse(requireNotNull(result.body()), now())
+            AuthSession.fromResponse(requireNotNull(result.body()), now()).let { renewed ->
+                val preserved = renewed.copy(sessionId = session.sessionId)
+                if (session.userId == null) preserved else preserved.withUser(
+                    com.arete.app.data.remote.dto.CurrentUserDto(session.userId, session.ranches)
+                )
+            }
         } catch (error: RuntimeException) {
             throw IOException("Respuesta de sesión inválida.", error)
         }

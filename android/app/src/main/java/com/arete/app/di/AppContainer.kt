@@ -40,9 +40,9 @@ class AppContainer(context: Context) {
 
     private val publicClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
-        .connectTimeout(90, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
-        .writeTimeout(90, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
     private fun createApi(client: OkHttpClient): ApiService = Retrofit.Builder()
@@ -59,7 +59,7 @@ class AppContainer(context: Context) {
     val apiService = createApi(authenticatedClient)
     val authRepository = AuthRepository(authApi, tokenStorage, authenticatedApi = apiService)
     val syncRepository = SyncRepository(database.pendingOperationDao())
-    val inventoryRepository = InventoryRepositoryFactory.create(tokenStorage)
+    val inventoryRepository = InventoryRepositoryFactory.create(tokenStorage, apiService, authRepository)
     // HU-54 cambia solo esta línea por el lector NFC/QR real.
     val lectorArete: LectorArete = SimulatedLectorArete()
 }

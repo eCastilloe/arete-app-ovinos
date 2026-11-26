@@ -108,7 +108,7 @@ internal fun LoginContent(
                         "Necesitas internet para iniciar sesión. Después puedes volver a abrir la app sin señal mientras tu sesión siga vigente.",
                         style = MaterialTheme.typography.bodySmall
                     )
-                    if (state.isLoading) Text("Conectando… El primer acceso puede tardar hasta 90 segundos.",
+                    if (state.isLoading) Text("Conectando… El primer acceso puede tardar alrededor de un minuto.",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                     AreteButton(if (state.isLoading) "Entrando…" else "Entrar", submit, enabled = !state.isLoading)

@@ -3,6 +3,8 @@ package com.arete.app.auth
 import com.arete.app.data.local.AuthSession
 import com.arete.app.data.local.SessionStore
 import com.arete.app.data.remote.dto.LoginResponse
+import com.arete.app.data.remote.dto.CurrentUserDto
+import com.arete.app.data.remote.dto.RanchAccessDto
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -33,3 +35,8 @@ fun testResponse(marker: String = "one") = LoginResponse(
 
 fun testSession(accessExpiry: Long = TEST_NOW + 60_000, refreshExpiry: Long = TEST_NOW + 600_000) =
     AuthSession(testToken("access", accessExpiry), testToken("refresh", refreshExpiry), accessExpiry, refreshExpiry)
+
+fun testUser(canEdit: Boolean = true) = CurrentUserDto("test-user", listOf(
+    RanchAccessDto("ranch-1", "Rancho de prueba", "encargado", "asignacion", true, canEdit, false, false),
+    RanchAccessDto("ranch-2", "Segundo rancho", "productor", "propietario", true, true, true, true)
+))

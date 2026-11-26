@@ -84,7 +84,7 @@ class LiveSessionExpiryTest {
                 requireNotNull(args.getString("producerPassword"))
             ).isSuccess)
         }
-        val rawClient = OkHttpClient.Builder().callTimeout(90, TimeUnit.SECONDS).build()
+        val rawClient = OkHttpClient.Builder().callTimeout(60, TimeUnit.SECONDS).build()
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             compose.waitUntil(15_000) {
                 compose.onAllNodesWithTag("inventory-list").fetchSemanticsNodes().isNotEmpty()
@@ -117,6 +117,9 @@ class LiveSessionExpiryTest {
                     runBlocking { container.tokenStorage.getSession()?.accessToken?.let { it != before.accessToken } == true }
                 }
                 val after = runBlocking { requireNotNull(container.tokenStorage.getSession()) }
+                assertTrue("Assigned ranches remain available", after.ranches.isNotEmpty())
+                assertEquals(before.ranches, after.ranches)
+                assertEquals(before.sessionId, after.sessionId)
                 assertTrue("Renewed access must be valid", after.accessExpiresAt > System.currentTimeMillis())
                 assertTrue("Rotated refresh must be persisted", after.refreshToken != before.refreshToken)
                 assertTrue("Authenticated request after renewal", runBlocking { container.apiService.getCurrentUser().isSuccessful })

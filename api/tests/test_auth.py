@@ -17,6 +17,7 @@ def _sin_bd(monkeypatch):
                         lambda e: USUARIO if e.lower() == "prueba@arete.mx" else None)
     monkeypatch.setattr(auth, "buscar_usuario_por_id", lambda i: USUARIO if i == ID else None)
     monkeypatch.setattr(auth, "registrar_acceso", lambda i: None)
+    monkeypatch.setattr(auth, "ranchos_del_usuario", lambda i: [])
 
 
 def _yo(token):

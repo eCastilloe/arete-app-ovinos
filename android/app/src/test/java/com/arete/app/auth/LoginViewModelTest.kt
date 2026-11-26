@@ -26,7 +26,8 @@ class LoginViewModelTest {
     private val api = object : ApiService {
         override suspend fun login(request: LoginRequest): LoginResponse { calls++; return handler(request) }
         override suspend fun getHealth(): Response<Map<String, Any>> = error("Not used")
-        override suspend fun getCurrentUser(): Response<Map<String, String>> = error("Not used")
+        override suspend fun getCurrentUser(authorization: String?): Response<CurrentUserDto> = Response.success(testUser())
+        override suspend fun getInventory(ranchId: String, situation: String, pageSize: Int, page: Int): InventoryPageDto = error("Not used")
         override fun refresh(request: RefreshRequest): Call<LoginResponse> = error("Not used")
     }
     private fun model() = LoginViewModel(AuthRepository(api, sessions, now = { TEST_NOW }))

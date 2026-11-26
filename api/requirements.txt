@@ -6,3 +6,4 @@ pydantic-settings==2.16.3
 python-dotenv==1.2.4
 pwdlib[argon2]==0.4.2
 PyJWT==2.15.1
+tzdata==2026.6
