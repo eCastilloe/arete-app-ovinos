@@ -16,6 +16,7 @@ import androidx.navigation.navArgument
 import com.arete.app.ui.screens.animal.AnimalDetailScreen
 import com.arete.app.ui.screens.home.HomeScreen
 import com.arete.app.ui.screens.login.LoginScreen
+import com.arete.app.ui.screens.inventory.InventoryScreen
 
 @Composable
 fun AreteNavHost(isLoggedIn: Boolean?) {
@@ -37,8 +38,12 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
             HomeScreen(
                 onAnimalRead = { animalId ->
                     navController.navigate(AppRoutes.animalDetail(animalId))
-                }
+                },
+                onInventory = { navController.navigate(AppRoutes.INVENTORY) { launchSingleTop = true } }
             )
+        }
+        composable(AppRoutes.INVENTORY) {
+            InventoryScreen(onHome = { navController.popBackStack(AppRoutes.HOME, false) })
         }
         composable(
             route = AppRoutes.ANIMAL_DETAIL,

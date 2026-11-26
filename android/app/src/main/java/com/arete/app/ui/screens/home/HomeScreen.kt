@@ -24,6 +24,7 @@ import com.arete.app.ui.components.SexChip
 
 @Composable
 fun HomeScreen(
+    onInventory: () -> Unit = {},
     onAnimalRead: (animalId: String) -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory)
 ) {
@@ -73,6 +74,7 @@ fun HomeScreen(
                 onClick = viewModel::readTag,
                 enabled = readerState !is ReaderState.Reading
             )
+            AreteSecondaryButton(text = "Ver inventario", onClick = onInventory)
             AreteSecondaryButton(text = "Cerrar sesión", onClick = viewModel::logout)
         }
     }
