@@ -1,7 +1,9 @@
+from pathlib import Path
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from app.db import engine
-from app.routers import auth, animales, encargados, partos, ranchos, pesajes
+from app.routers import auth, animales, encargados, partos, ranchos, pesajes, panel
 
 app = FastAPI(title="Arete API", description="API del sistema de control de ranchos ovinos", version="0.1.0")
 from fastapi.responses import JSONResponse
@@ -68,6 +70,8 @@ async def errores_bd(request, exc):
             "detalle": "Falta un campo obligatorio"})
     raise exc
 
+app.mount("/panel/static", StaticFiles(directory=str(Path(__file__).resolve().parent / "static" / "panel")), name="panel_static")
+app.include_router(panel.router)
 app.include_router(auth.router)
 app.include_router(animales.router)
 app.include_router(encargados.router)

@@ -1,0 +1,4 @@
+{% extends 'base.html' %}{% block title %}Entrar · Arete{% endblock %}
+{% block content %}<section class="login"><div class="marca"><span class="arete rosa">79</span><span class="arete azul">312</span><strong>Arete</strong></div><p class="sub">Panel de la Asociación</p><h1>Entrar</h1>
+{% if error %}<p role="alert" class="error">{{ error }}</p>{% endif %}
+<form method="post" action="/panel/login"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Correo electrónico<input name="email" type="email" autocomplete="username" required></label><label>Contraseña<input name="password" id="login-password" type="password" autocomplete="current-password" required></label><label class="check"><input type="checkbox" data-password="login-password"> Mostrar contraseña</label><button class="principal">Entrar</button></form><p class="sub">Usa la cuenta que te proporcionó la Asociación.</p></section>{% endblock %}
