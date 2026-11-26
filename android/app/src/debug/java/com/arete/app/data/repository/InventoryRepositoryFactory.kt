@@ -3,11 +3,18 @@ package com.arete.app.data.repository
 import com.arete.app.data.local.TokenStorage
 import com.arete.app.data.model.*
 import android.content.Context
+import com.arete.app.data.remote.ApiService
 import java.io.File
 
 // This entire source set is excluded from release builds. No real ranch is changed.
 object InventoryRepositoryFactory {
-    fun create(context: Context, tokenStorage: TokenStorage): InventoryRepository = createDemoAnimals(context, tokenStorage)
+    fun create(context: Context, tokenStorage: TokenStorage, apiService: ApiService): InventoryRepository {
+        val demo = createDemoAnimals(context, tokenStorage)
+        val remote = RemoteInventoryRepository(apiService)
+        return InventoryRepository {
+            if (tokenStorage.getToken() == "demo-token") demo.load() else remote.load()
+        }
+    }
 }
 
 object AnimalEditorRepositoryFactory {
@@ -27,7 +34,7 @@ object DemoInventoryData {
             repeat(sizes[0]) { index ->
                 add(animal(index, AnimalCategory.EWE).copy(
                     folio = if (index == 0) "AIR-2253" else "H-${index + 1}",
-                    reproductiveState = listOf("Mantenimiento", "Gestante", "En lactancia", "En empadre")[index % 4],
+                    reproductiveState = listOf("Vacía", "Gestante", "Lactando", "En empadre")[index % 4],
                     lastWeightKg = if (index % 5 == 4) null else 40.0 + index % 11
                 ))
             }

@@ -96,7 +96,7 @@ internal fun InventoryContent(
                         modifier = Modifier.semantics { heading() })
                     if (!state.isLoading && state.error == null) {
                         Text(state.ranchName, style = MaterialTheme.typography.titleMedium)
-                        Text(if (state.isDemo) "Datos de ejemplo · prueba local" else "Inventario local",
+                        Text(if (state.isDemo) "Datos de ejemplo · prueba local" else "Datos consultados del rancho",
                             style = MaterialTheme.typography.bodySmall, color = InkSecondary)
                     }
                 }
@@ -199,7 +199,7 @@ private fun AnimalRow(animal: InventoryAnimal, onEdit: ((String) -> Unit)?, onOp
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             AnimalTag(animal, Modifier.width(118.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(animal.breed, style = MaterialTheme.typography.titleMedium)
+                Text(animal.breed?.takeIf { it.isNotBlank() } ?: "Sin raza", style = MaterialTheme.typography.titleMedium)
                 Text(if (animal.situation != AnimalSituation.ACTIVE) animal.situation.label
                     else animal.reproductiveState ?: animal.category.label, style = MaterialTheme.typography.bodyMedium)
                 Text(animal.lastWeightKg?.takeIf { it.isFinite() && it > 0 }?.let { "${formatKg(it)} kg" } ?: "Sin pesaje",

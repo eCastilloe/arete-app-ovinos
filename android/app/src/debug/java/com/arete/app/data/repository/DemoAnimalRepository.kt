@@ -74,7 +74,7 @@ class DemoAnimalRepository(
         return DemoInventoryData.snapshot().animals.map { animal ->
             AnimalRecord(animal.id, animal.ranchId, AnimalForm(
                 folio = animal.folio, siniiga = animal.siniiga.orEmpty(), sex = animal.sex,
-                category = animal.category, breed = animal.breed, color = "Blanco", reason = EntryReason.PURCHASE,
+                category = animal.category, breed = animal.breed.orEmpty(), color = "Blanco", reason = EntryReason.PURCHASE,
                 birthDate = if (animal.category.section == InventoryCategory.YOUNG) "01/01/2026" else "01/01/2020",
                 reproductiveState = animal.reproductiveState.orEmpty()
             ), situation = animal.situation, lastWeightKg = animal.lastWeightKg, birthLocked = animal.id == "animal-20000")

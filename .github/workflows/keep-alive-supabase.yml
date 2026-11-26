@@ -1,0 +1,36 @@
+name: Keep-alive de Supabase
+
+on:
+  schedule:
+    - cron: "43 14 * * *"   # diario 14:43 UTC = 8:43 a. m. en Ciudad de México
+  workflow_dispatch:
+  
+
+permissions:
+  contents: read
+
+jobs:
+  tocar-bucket:
+    name: listar bucket de evidencias
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      BUCKET: evidencias
+    steps:
+      - name: Revisar que existan los secretos
+        run: |
+          faltan=0
+          [ -z "$SUPABASE_URL" ] && echo "::error::Falta el secreto SUPABASE_URL" && faltan=1
+          [ -z "$SUPABASE_SERVICE_KEY" ] && echo "::error::Falta el secreto SUPABASE_SERVICE_KEY" && faltan=1
+          exit $faltan
+
+      - name: Listar el bucket (consulta real a la BD de Supabase)
+        run: |
+          respuesta=$(curl -sS --fail-with-body --retry 3 --retry-delay 10 \
+            -X POST "${SUPABASE_URL%/}/storage/v1/object/list/$BUCKET" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"prefix": "", "limit": 1}')
+          echo "Bucket $BUCKET respondió. Objetos en la muestra: $(echo "$respuesta" | jq 'length')"

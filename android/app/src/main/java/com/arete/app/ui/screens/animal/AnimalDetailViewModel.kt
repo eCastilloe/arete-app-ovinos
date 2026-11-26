@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.arete.app.AreteApplication
 import com.arete.app.data.model.AnimalDetail
 import com.arete.app.data.repository.*
+import com.arete.app.ui.navigation.AppRoutes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,7 +28,7 @@ class AnimalDetailViewModel(
     savedState: SavedStateHandle,
     private val today: () -> LocalDate = { LocalDate.now(ZoneId.of("America/Mexico_City")) }
 ) : ViewModel() {
-    private val animalId = savedState.get<String>("animalId").orEmpty()
+    private val animalId = savedState.get<String>(AppRoutes.ARG_ANIMAL_ID).orEmpty()
     private val mutableState = MutableStateFlow(AnimalDetailState(onDate = today()))
     val state = mutableState.asStateFlow()
     private var loadingJob: Job? = null
