@@ -20,5 +20,13 @@ data class AnimalDetail(
     val motherLabel: String,
     val fatherLabel: String,
     val canEdit: Boolean,
-    val isDemo: Boolean
+    val isDemo: Boolean,
+    val birthWeightKg: Double? = null,
+    val circumferenceDate: String? = null,
+    val entryReasonLabel: String = animal.form.reason?.label.orEmpty()
 )
+
+/** Prefer a measured weight; birth weight is only a fallback. */
+val AnimalDetail.displayWeightKg: Double? get() = animal.lastWeightKg?.takeIf { it.isFinite() && it > 0 }
+    ?: birthWeightKg?.takeIf { it.isFinite() && it > 0 }
+val AnimalDetail.usesBirthWeight: Boolean get() = animal.lastWeightKg?.takeIf { it.isFinite() && it > 0 } == null && displayWeightKg != null

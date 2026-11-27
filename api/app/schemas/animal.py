@@ -171,6 +171,10 @@ class AnimalSalida(BaseModel):
     observaciones: str | None
     nacimiento_bloqueado: bool             # viene de un parto: fecha, madre y sexo no se editan
     ultimo_peso_kg: float | None
+    # HU-20: lecturas opcionales; no cambian el contrato de escritura.
+    peso_nacimiento_kg: float | None = None
+    ultima_circunferencia_testicular_cm: float | None = None
+    fecha_ultima_circunferencia: date | None = None
     version: int
     actualizado_en: datetime
 

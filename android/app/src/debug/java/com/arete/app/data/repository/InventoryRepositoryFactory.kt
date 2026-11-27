@@ -79,3 +79,12 @@ object DemoInventoryData {
         breed = "Dorper"
     )
 }
+
+object AnimalDetailRepositoryFactory {
+    fun create(context: Context, tokens: TokenStorage, remote: AnimalDetailRepository): AnimalDetailRepository {
+        val demo = LocalAnimalDetailRepository(createDemoAnimals(context, tokens))
+        return AnimalDetailRepository { id ->
+            if (tokens.getSession()?.isDemo == true) demo.loadDetail(id) else remote.loadDetail(id)
+        }
+    }
+}

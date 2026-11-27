@@ -14,3 +14,8 @@ object AnimalEditorRepositoryFactory {
     @Suppress("UNUSED_PARAMETER")
     fun create(context: Context, tokenStorage: TokenStorage, remote: AnimalEditorRepository): AnimalEditorRepository = remote
 }
+
+object AnimalDetailRepositoryFactory {
+    @Suppress("UNUSED_PARAMETER")
+    fun create(context: Context, tokens: TokenStorage, remote: AnimalDetailRepository): AnimalDetailRepository = remote
+}

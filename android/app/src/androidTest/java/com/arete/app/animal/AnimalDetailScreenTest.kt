@@ -6,6 +6,9 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -60,6 +63,23 @@ class AnimalDetailScreenTest {
         compose.onNodeWithText("32.0 cm").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Estado reproductivo").assertDoesNotExist()
     }
+    @Test fun birthWeightFallbackIsExplicitAndAllRenderedTextIsAtLeast16sp() {
+        open(detail(female.copy(lastWeightKg = null)).copy(birthWeightKg = 3.2))
+        compose.onNodeWithText("3.2 kg (al nacer)").performScrollTo().assertIsDisplayed()
+        val textNodes = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult), useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertTrue(textNodes.isNotEmpty())
+        compose.runOnIdle {
+            textNodes.forEach { node ->
+                val layouts = mutableListOf<TextLayoutResult>()
+                node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action?.invoke(layouts)
+                layouts.forEach { assertTrue("Texto menor a 16 sp: ${it.layoutInput.text}", it.layoutInput.style.fontSize.value >= 16f) }
+            }
+        }
+        compose.onNodeWithTag("detail-edit").performScrollTo().assertHeightIsAtLeast(56.dp)
+        compose.onNodeWithTag("detail-home").performScrollTo().assertHeightIsAtLeast(56.dp)
+        compose.onNodeWithTag("detail-back").assertHeightIsAtLeast(56.dp)
+    }
     @Test fun missingWeightUnknownDateAndDischargeAreExplicit() {
         open(detail(female.copy(form = female.form.copy(birthDate = ""), lastWeightKg = null, situation = AnimalSituation.SOLD)))
         compose.onNodeWithTag("detail-age").performScrollTo().assertTextEquals("Edad no disponible")
@@ -97,7 +117,7 @@ class AnimalDetailScreenTest {
         }
         compose.waitUntil(10_000) { !model.state.value.loading }
         compose.onNodeWithTag("detail-error").assertIsDisplayed()
-        compose.onNodeWithTag("detail-retry").performClick()
+        compose.onNodeWithTag("detail-retry").assertHeightIsAtLeast(56.dp).performClick()
         compose.waitUntil(10_000) { !model.state.value.loading && model.state.value.detail != null }
         compose.onNodeWithText("Arete 79").assertIsDisplayed()
         compose.runOnIdle { model.reload() }

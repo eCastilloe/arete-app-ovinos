@@ -30,7 +30,8 @@ import java.util.Locale
 
 @Composable
 fun AnimalDetailScreen(onBack: () -> Unit, onHome: () -> Unit, onEdit: (String) -> Unit,
-    refreshKey: Long = 0L, viewModel: AnimalDetailViewModel = viewModel(factory = AnimalDetailViewModel.Factory)) {
+    refreshKey: Long = 0L, backLabel: String = "Volver al inventario",
+    viewModel: AnimalDetailViewModel = viewModel(factory = AnimalDetailViewModel.Factory)) {
     val state by viewModel.state.collectAsState()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, viewModel) {
@@ -39,17 +40,17 @@ fun AnimalDetailScreen(onBack: () -> Unit, onHome: () -> Unit, onEdit: (String) 
         onDispose { lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(refreshKey) { if (refreshKey != 0L) viewModel.reload() }
-    AnimalDetailContent(state, viewModel::reload, onBack, onHome, onEdit)
+    AnimalDetailContent(state, viewModel::reload, onBack, onHome, onEdit, backLabel)
 }
 
 @Composable
 internal fun AnimalDetailContent(state: AnimalDetailState, onRetry: () -> Unit, onBack: () -> Unit,
-    onHome: () -> Unit, onEdit: (String) -> Unit) {
+    onHome: () -> Unit, onEdit: (String) -> Unit, backLabel: String = "Volver al inventario") {
     val detail = state.detail
     val scroll = rememberScrollState()
     Scaffold(bottomBar = {
         Column(Modifier.fillMaxWidth().background(Paper).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            AreteSecondaryButton("Volver al inventario", onBack, Modifier.testTag("detail-back"))
+            AreteSecondaryButton(backLabel, onBack, Modifier.testTag("detail-back"))
         }
     }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
@@ -79,7 +80,7 @@ internal fun AnimalDetailContent(state: AnimalDetailState, onRetry: () -> Unit, 
                             verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("Arete ${form.folio}", color = ink, style = MaterialTheme.typography.displayMedium)
                             Text(if (female) "♀ Hembra" else "♂ Macho", color = ink, style = MaterialTheme.typography.titleMedium)
-                            Text("${form.breed} · ${form.color}", color = ink, style = MaterialTheme.typography.bodyLarge)
+                            Text("${form.breed.ifBlank { "Raza sin registrar" }} · ${form.color.ifBlank { "Color sin registrar" }}", color = ink, style = MaterialTheme.typography.bodyLarge)
                             val age = animalAge(parseBirthDate(form.birthDate), state.onDate)?.label ?: "Edad no disponible"
                             Text(if (form.approximateDate && age != "Edad no disponible") "$age (aproximada)" else age,
                                 color = ink, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.testTag("detail-age"))
@@ -93,17 +94,20 @@ internal fun AnimalDetailContent(state: AnimalDetailState, onRetry: () -> Unit, 
                         DetailValue("Situación", animal.situation.label)
                         if (female) DetailValue("Estado reproductivo", form.reproductiveState)
                         else DetailValue("Destino", form.destination)
-                        DetailValue("Último peso", animal.lastWeightKg?.takeIf { it.isFinite() && it > 0 }
-                            ?.let { "${decimal(it)} kg" } ?: "Sin pesaje")
+                        DetailValue("Último peso", detail.displayWeightKg
+                            ?.let { "${decimal(it)} kg${if (detail.usesBirthWeight) " (al nacer)" else ""}" } ?: "Sin pesaje")
                         if (!female) DetailValue("Circunferencia testicular", animal.lastTesticularCircumferenceCm
                             ?.takeIf { it.isFinite() && it > 0 && it < 60 }?.let { "${decimal(it)} cm" } ?: "Sin registrar",
                             Modifier.testTag("detail-circumference"))
+                        if (!female && animal.lastTesticularCircumferenceCm != null && detail.circumferenceDate != null)
+                            DetailValue("Fecha de la medición", runCatching { java.time.LocalDate.parse(detail.circumferenceDate).format(BirthDateFormat) }.getOrDefault("Sin registrar"))
                         HorizontalDivider(color = Line)
                         Text("Foto", style = MaterialTheme.typography.titleLarge)
                         DetailPhoto(form.photoPath)
+                        if (form.photoPath != null && !detail.isDemo) Text("Foto guardada en este celular", style = MaterialTheme.typography.bodySmall)
                         HorizontalDivider(color = Line)
                         Text("Origen y registro", style = MaterialTheme.typography.titleLarge)
-                        DetailValue("Motivo de ingreso", form.reason?.label.orEmpty())
+                        DetailValue("Motivo de ingreso", detail.entryReasonLabel)
                         DetailValue("Madre", detail.motherLabel)
                         DetailValue("Semental", detail.fatherLabel)
                         DetailValue("Tipo de parto", form.birthType)

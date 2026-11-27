@@ -42,8 +42,21 @@ SELECT a.id, a.rancho_id, a.folio, a.siniiga, a.registro_uno, a.adn, a.nombre, a
        a.tipo_parto_nacimiento, a.metodo_concepcion, a.criador, a.propietario_actual,
        a.observaciones, a.parto_origen_id IS NOT NULL AS nacimiento_bloqueado,
        (SELECT p.peso_kg FROM pesaje p
-         WHERE p.animal_id = a.id AND p.eliminado_en IS NULL
-         ORDER BY p.fecha DESC, p.creado_en DESC LIMIT 1) AS ultimo_peso_kg,
+         WHERE p.animal_id = a.id AND p.rancho_id = a.rancho_id AND p.eliminado_en IS NULL
+         ORDER BY p.fecha DESC, p.creado_en DESC, p.id DESC LIMIT 1) AS ultimo_peso_kg,
+       (SELECT pc.peso_nacimiento_kg FROM parto_cria pc
+          JOIN parto b ON b.id = pc.parto_id AND b.rancho_id = a.rancho_id
+         WHERE pc.cria_id = a.id AND pc.parto_id = a.parto_origen_id
+           AND pc.rancho_id = a.rancho_id AND pc.eliminado_en IS NULL
+           AND b.eliminado_en IS NULL LIMIT 1) AS peso_nacimiento_kg,
+       (SELECT p.circunferencia_testicular_cm FROM pesaje p
+         WHERE p.animal_id = a.id AND p.rancho_id = a.rancho_id AND a.sexo = 'M'
+           AND p.eliminado_en IS NULL AND p.circunferencia_testicular_cm IS NOT NULL
+         ORDER BY p.fecha DESC, p.creado_en DESC, p.id DESC LIMIT 1) AS ultima_circunferencia_testicular_cm,
+       (SELECT p.fecha FROM pesaje p
+         WHERE p.animal_id = a.id AND p.rancho_id = a.rancho_id AND a.sexo = 'M'
+           AND p.eliminado_en IS NULL AND p.circunferencia_testicular_cm IS NOT NULL
+         ORDER BY p.fecha DESC, p.creado_en DESC, p.id DESC LIMIT 1) AS fecha_ultima_circunferencia,
        a.version, a.actualizado_en
   FROM animal a
   LEFT JOIN raza r    ON r.id = a.raza_id

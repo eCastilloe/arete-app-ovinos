@@ -1,157 +1,102 @@
-# HU-20 — Detalle de ficha: trabajo y pruebas locales
+# HU-20 — Ficha real, edad y color por sexo
 
-## Contexto y elección de tarea
+Actualizado el 26/11/2026. [PR #17](https://github.com/eCastilloe/arete-app-ovinos/pull/17) · [Trello](https://trello.com/c/MzKiTxtm).
 
-Revisados el 19 de noviembre de 2026: documentos de contexto entregados por Marvin,
-backlog, SRS (RF-05 y RF-15), modelo de datos, guía visual y Trello.
+## Estado y contexto
 
-- [HU-20 en Trello](https://trello.com/c/MzKiTxtm/22-hu-20-detalle-de-ficha-con-edad-y-c%C3%B3digo-de-color-3):
-  Marvin, Must, 3 puntos, Sprint 2, vencimiento 26 de noviembre. Continúa en Backlog.
-- HU-12 (Mi equipo) también corresponde a Marvin en Sprint 2. No hay un orden
-  obligatorio entre ambas en las tarjetas consultadas. Se adelantó HU-20 por su
-  continuidad con inventario y ficha, aprovechando las pruebas locales existentes.
-- HU-08, HU-18 y HU-19 siguen pendientes de su integración real y revisión del equipo.
-  Pausar el trabajo local no equivale a marcar las tarjetas como terminadas.
-- No se modificaron tarjetas ni se publicó código.
+Correcciones del comentario de FelipeRmz29 del 23/11. Revisados AGENTS.md entregado por Marvin, contexto del proyecto, backlog HU-20, SRS RF-05/RF-15 y guía visual. HU-19 sigue en revisión: se incorporó su commit `9259518` a `codex/HU-20-detalle`, conservando los cambios de Emmanuel en `3c91c84`. El PR conserva base `codex/HU-19-ficha` y estado Draft. No se fusionó nada a main.
 
-## Dónde está cada trabajo
+## Qué cambió, explicado paso a paso
 
-HU-19 quedó conservada en `arete-hu19`, rama `codex/HU-19-ficha`, punto local
-`e1eb917` (WIP: ficha y fotos probadas en local, pendiente de API).
+1. **Actualizar la rama:** `pull` descarga los cambios que publicó el equipo; la integración conserva la ficha de HU-20 y las correcciones reales de login, inventario y edición. Se resolvieron los cruces en AppContainer y AreteNavHost.
+2. **Consultar la ficha:** `RemoteAnimalDetailRepository.kt` pide `GET /animales/{id}`. Primero actualiza la sesión y consulta el rancho autorizado. Rechaza respuestas de otro rancho, otro ID o progenitores externos usados como ficha. Un encargado sin permiso de edición puede leer. Los errores no se sustituyen por datos demo.
+3. **Elegir el origen:** las fábricas de debug permiten la sesión demo explícita. En release se usa siempre el repositorio remoto. Se conserva el interceptor de renovación de HU-08.
+4. **Dibujar la pantalla:** Kotlin es el lenguaje; Jetpack Compose crea los textos, colores y botones. El ViewModel carga el repositorio y entrega su estado a la pantalla. Se conservan rosa/hembra, azul/macho, errores/reintento y valores ausentes explícitos.
+5. **Peso y medida:** se muestra el último pesaje; si falta, el peso al nacer con la indicación `(al nacer)`; si ambos faltan, `Sin pesaje`. La circunferencia aparece solo en machos, con fecha de su última medición disponible cuando existe.
+6. **Navegar:** Inventario y Leer arete usan `AppRoutes.ANIMAL_DETAIL`. Editar regresa a la ficha y solicita recarga. Inicio funciona también cuando el login abrió directamente Inventario. El regreso desde una lectura indica `Volver a Inicio`.
+7. **Probar y documentar:** pruebas automáticas de lógica, interfaz y consultas reales con ambas cuentas; capturas guardadas junto a esta guía.
 
-HU-20 se desarrolla en `arete-hu20`, rama `codex/HU-20-detalle`, a partir de ese
-punto. Incluye la base local de HU-18/HU-19 para poder probar el recorrido completo.
-El futuro PR de HU-20 debe mostrar únicamente sus cambios, después de coordinar
-la integración de esas dependencias. Un commit local no es un push a GitHub.
+Los progenitores son texto, sin enlaces: navegar a madre/padre corresponde a HU-23. No se agregaron acciones de parto, pesaje, baja ni árbol genealógico.
 
-## Qué programamos y para qué
+## Contrato de API y cambio de backend pendiente de despliegue
 
-Todo el código de esta pantalla es Kotlin. Jetpack Compose dibuja la interfaz.
+Se consultó el OpenAPI publicado en `https://arete-api-90hx.onrender.com/openapi.json`. El despliegue actual entrega `ultimo_peso_kg`, pero no peso al nacer ni circunferencia. Por eso este PR incluye una ampliación de lectura en Python/SQL (`api/app/routers/animales.py` y `api/app/schemas/animal.py`):
 
-1. `AnimalDetail.kt`: calcula edad con meses de calendario y días restantes.
-   Usa `Period.between`; convierte los años en meses. No divide los días entre 30.
-   Fechas ausentes, inválidas o futuras muestran "Edad no disponible".
-2. `AnimalDetailRepository.kt`: consulta la ficha y nombres de progenitores.
-   Reutiliza el origen de datos local de HU-19 a través de una interfaz de lectura;
-   no guarda datos ni exige permiso de edición para consultar.
-3. `AnimalDetailViewModel.kt`: carga los datos, muestra errores y permite reintentar.
-   Al recargar, limpia los datos anteriores mientras vuelve a consultar el acceso.
-4. `AnimalDetailScreen.kt`: muestra cabecera rosa/azul, sexo escrito y símbolo,
-   edad, identificación, situación, categoría, último peso, fotografía y origen.
-   Circunferencia testicular solo en machos; estado reproductivo solo en hembras.
-   No se inventan pesos ni medidas: se muestra "Sin pesaje" o "Sin registrar".
-5. `AreteNavHost.kt` e `InventoryScreen.kt`: agregan "Ver ficha". Desde el detalle
-   se puede editar si el permiso lo permite, regresar al inventario o ir a Inicio.
-   Después de guardar se actualizan tanto el detalle como el inventario.
+| Campo opcional nuevo | Origen |
+| --- | --- |
+| `peso_nacimiento_kg` | `parto_cria` de la misma cría, rancho y parto de origen; excluye cría/parto anulados |
+| `ultima_circunferencia_testicular_cm` | Último pesaje no anulado que tenga medida, solo macho y mismo rancho |
+| `fecha_ultima_circunferencia` | Fecha de esa misma medición |
 
-Los archivos anteriores están bajo `android/app/src/main/java/com/arete/app/`.
-La edad se actualiza al consultar y al regresar a la pantalla; usa la fecha de
-`America/Mexico_City`. Si el nacimiento es aproximado, la edad también se indica
-como aproximada. La foto se decodifica fuera del hilo de interfaz y se reduce
-para la vista previa.
+El orden de pesajes usa fecha, creación e ID. `ultimo_peso_kg` sigue significando pesaje; la app elige el peso al nacer únicamente como alternativa. No se cambian escrituras, tablas ni permisos. No hay migración nueva. Los nuevos campos son opcionales para mantener compatibilidad con la API actualmente desplegada.
 
-## Límites de esta historia
+**Felipe debe revisar y desplegar esta ampliación.** El peso al nacer y la circunferencia ya están probados con datos temporales y contratos controlados, pero todavía no pueden declararse comprobados contra Render. Después del despliegue hay que repetir con una cría que tenga peso de parto y ningún pesaje, y un macho con medida.
 
-HU-20 es la consulta de ficha. Registrar pesajes, bajas, partos, empadres y navegar
-el árbol genealógico corresponden a otras historias. Los nombres de madre y
-semental se muestran como información, sin botones que prometan esos flujos.
+Las fotografías existentes se leen del almacenamiento privado de este celular, asociadas por rancho/animal. Se indica esa procedencia. Este PR no implementa descarga ni sincronización de fotos: el contrato de ficha desplegado no expone un identificador de fotografía.
 
-El modo de prueba sigue usando los datos privados del dispositivo de HU-19.
-La circunferencia es una lectura opcional de la última medición disponible; no se
-añade su captura al formulario HU-19. Según el modelo de datos se origina en pesajes.
-La integración deberá precisar qué medición y fecha devuelve la API.
+## Resultados del 26/11/2026
 
-La versión release no habilita datos demo ni simula una integración real. El
-adaptador devuelve un error si el origen real aún no está disponible.
+| Comprobación | Resultado |
+| --- | --- |
+| Android JVM `testDebugUnitTest` | 118 aprobadas, 0 fallos |
+| Pantallas y regresión en API 26 / RAM 2048 MB | 36 aprobadas; 9 pruebas optativas omitidas por no activar sus escenarios de otras HU |
+| `LiveAnimalDetailTest` con Render | 2 aprobadas: productor y encargado; solo lectura de datos existentes |
+| `assembleDebug`, APK de pruebas y `compileReleaseKotlin` | Correctos |
+| `lintDebug` | 0 errores, 29 advertencias existentes en el proyecto |
+| Backend `pytest -q` | 99 aprobadas, 87 omitidas porque requieren BD/configuración externa |
+| Backend propias HU-20 | 8 aprobadas; consulta SQL real ejecutada sobre SQLite temporal |
+| `git diff --check` | Sin errores |
 
-## Criterios y pruebas
+Las pruebas SQLite comprueban selección, orden, datos ausentes y exclusión de registros anulados/ajenos; **no sustituyen las pruebas RLS sobre PostgreSQL**. La suite de aislamiento del equipo sigue pendiente de ejecutarse con su BD de pruebas. En esta ejecución no se crearon, editaron ni borraron animales reales.
 
-| Criterio de Trello | Comprobación |
-|---|---|
-| 01/08/2026 → 12/11/2026: 3 meses 11 días | Prueba unitaria y prueba de pantalla con fecha fija |
-| Rosa para hembras, azul para machos, texto/símbolo | Pruebas de pantalla y revisión visual |
-| Sin circunferencia testicular en hembras | Prueba que incluye deliberadamente una medida en una hembra y verifica que no se dibuje |
-| Estado reproductivo, situación y último peso | Pruebas de pantalla, incluyendo Vendido y Sin pesaje |
+El workflow `Pruebas backend / pytest (api)` se activa para PR con base main. Al conservar temporalmente base HU-19 no se atribuye un éxito de CI a este PR; pytest se ejecutó localmente. Al integrar #16 se deberá cambiar base a main, actualizar la rama y verificar ese check.
 
-También se prueban meses de distinta duración, año bisiesto, años expresados en
-meses, permisos de solo lectura, rechazo de fichas de otro rancho o eliminadas,
-progenitores externos/desconocidos, error/reintento y texto al 150 %.
+### Edad y accesibilidad
 
-Resultados del 19 de noviembre de 2026:
+- `01/08/2026 → 12/11/2026`: **3 meses 11 días**.
+- `31/01/2026 → 28/02/2026`: **0 meses 28 días**.
+- `31/01/2026 → 01/03/2026`: **1 mes 1 día**.
+- `29/02/2024 → 28/02/2025`: **11 meses 30 días**; `29/02/2024 → 01/03/2025`: **12 meses 1 día**.
+- `29/02/2024 → 29/02/2028`: **48 meses 0 días**.
 
-- Compilación debug, APK de pruebas y Kotlin release: correctas.
-- 30 pruebas unitarias: 9 de HU-20, 11 de HU-19, 9 de HU-18 y 1 del proyecto base; sin fallos.
-- `OK (25 tests)` en API 26 / 2 GB: 7 de HU-20, 11 de HU-19 y 7 de HU-18.
-- Revisión visual: AIR-2253 con rosa, Hembra, 82 meses 18 días, Mantenimiento y 40.0 kg.
-- Semental 312 con azul, Macho, 70.0 kg y circunferencia "Sin registrar".
-- BAJA-01 sigue accesible con situación Vendido y "Sin pesaje".
-- `prueba-hu19` conserva la foto capturada en HU-19 y los progenitores registrados.
-  Al editar su color de `negro` a `Negro`, guardar regresa al detalle actualizado.
-- El botón "Ir a Inicio" regresa correctamente a Inicio.
-- Se conservaron 71 registros (41 hembras activas, 2 sementales, 25 crías y 3 bajas).
-  `prueba-hu19` quedó en versión 4 con color `Negro` y el mismo archivo de foto
-  `e22939ba-f377-4ab7-b03b-61d294ef06a2.jpg`; editar no agregó otro animal.
+Se mantiene la convención `java.time.Period.between`: meses completos y días de calendario, sin dividir por 30 ni redondear el 31 de enero a un mes el 28 de febrero. La consulta utiliza la fecha de America/Mexico_City; datos inválidos/ausentes/futuros no producen edades inventadas.
 
-La revisión detectó que el formulario conservaba el rótulo "Volver al inventario"
-al entrar desde el detalle. Se ajustó para que indique "Volver a la ficha" en ese
-recorrido y conserve el rótulo anterior al agregar desde el inventario.
-La corrección se volvió a compilar (debug y Kotlin release) y se comprobó
-visualmente: entrar a Editar y pulsar "Volver a la ficha" abre de nuevo el detalle.
+`AnimalDetailScreenTest.birthWeightFallbackIsExplicitAndAllRenderedTextIsAtLeast16sp` obtiene los `TextLayoutResult` de los textos dibujados y exige tamaño ≥16 sp; mide los botones Editar, Inicio y Volver ≥56 dp. La prueba de error mide también Reintentar. Las pruebas incluyen texto al 150 %, permiso de solo lectura, bajas, ausencia de edad/peso y rechazo de datos anteriores tras fallar una recarga.
 
-## Cómo probarlo tú en el emulador
+### Evidencia de Render
 
-1. Abre Arete en el emulador API 26 / 2 GB. Entra en modo de prueba si aparece el login.
-2. Entra a Inventario y pulsa **Ver ficha** en una hembra.
-3. Comprueba la cabecera rosa y "♀ Hembra", edad, situación, estado reproductivo y peso.
-4. Desplázate hacia abajo: revisa foto, madre, semental y datos de registro.
-   No debe existir un campo de circunferencia testicular en esa hembra.
-5. Pulsa **Volver al inventario**, elige Sementales y abre el 312.
-   Debe tener cabecera azul, "♂ Macho" y circunferencia ("Sin registrar" si no hay medición).
-6. Prueba **Ver bajas** y abre un animal vendido o muerto: conserva su ficha e indica su situación.
-7. Busca `prueba-hu19`, abre su ficha y comprueba la fotografía guardada anteriormente.
-8. Si editas, guarda y comprueba que el detalle se actualiza sin duplicar animales.
-9. Pulsa **Ir a Inicio** y vuelve al Inventario.
+AIR-2253 tiene 40.0 kg y estado Gestante. HU18-C001 es macho sin pesaje. En estos registros semilla faltan raza/color/nacimiento; se comprueba que la pantalla lo indique sin inventarlos. Se verificó edición accesible para productor, ausencia del botón para encargado, regreso al inventario y a Inicio.
 
-El ejemplo de edad de Trello se evalúa con fecha fija en las pruebas; la pantalla
-normal usa el día actual. No cambies la fecha del dispositivo para forzar ese resultado.
+![Ficha real de hembra](evidence/hu20/producer-female.png)
+![Ficha real de macho sin peso](evidence/hu20/producer-male.png)
+![Consulta del encargado](evidence/hu20/worker-female.png)
+![Regreso a Inicio](evidence/hu20/producer-home.png)
 
-## Compilar y probar desde la terminal de VS Code
+## Cómo repetirlo
 
-En la carpeta `android` de `arete-hu20`, sin subir archivos:
+1. Abrir la carpeta de HU-20 en VS Code y `android/` en Android Studio para usar el emulador API 26 / 2 GB. La URL va en `android/local.properties` ignorado por Git: `API_BASE_URL=https://arete-api-90hx.onrender.com/`.
+2. Ejecutar la app debug. Entrar con la cuenta de productor compartida por el equipo; Inventario → Ver ficha en AIR-2253. Comprobar color, sexo, estado y 40.0 kg, sin circunferencia. Abrir Editar y volver a la ficha sin guardar.
+3. Volver al inventario y buscar HU18-C001. Ver ficha: azul, Macho, Sin pesaje y Circunferencia/Sin registrar. Ir a Inicio.
+4. Cerrar sesión y repetir con encargado. Puede consultar ambas fichas; no aparece Editar. No cambiar sus permisos para la prueba.
+5. Para datos completos de edad/progenitores, consultar el animal ficticio de HU-19 que ya existe en Rancho Demo. Los progenitores se muestran como texto.
+6. Para edad fija, peso al nacer y accesibilidad, ejecutar las pruebas controladas. No cambiar el reloj del emulador.
+
+Comandos desde `android/` (JDK de Android Studio):
 
 ```powershell
-$env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
-.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:compileReleaseKotlin --console=plain
+.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:compileReleaseKotlin :app:lintDebug
+.\gradlew.bat :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.arete.app.animal.AnimalDetailScreenTest
 ```
 
-En esta computadora se usa el script local ignorado por Git
-`android/.gradle/hu20-local-build.init.gradle` para guardar los archivos generados
-fuera de OneDrive y evitar sus bloqueos de archivos:
+Las pruebas reales son optativas: `LiveAnimalDetailTest` requiere argumentos `liveAnimalDetail=true`, `apiUrl`, `ranchId`, `producerEmail`, `producerPassword`, `workerEmail`, `workerPassword`. Pasarlos solo al ejecutar; no guardarlos en Git, capturas ni comentarios. No activar las otras pruebas reales de alta/borrado de datos para repetir esta consulta.
 
-```powershell
-.\gradlew.bat -I '.gradle\hu20-local-build.init.gradle' :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:compileReleaseKotlin --console=plain
-```
+En este equipo, un init script local ignorado redirige las carpetas generadas a Temp para evitar los bloqueos de OneDrive. No es una dependencia del proyecto. Para pytest en Windows se usó `PGCONNECT_TIMEOUT=3` para limitar la espera de `/salud` contra la BD local ausente.
 
-Salida: `C:\Users\daver\AppData\Local\Temp\arete-hu20-build\_app`.
-Registro de compilación: `android/.gradle/hu20-build.log` (ignorado por Git).
+## Pendientes para cerrar la historia
 
-```powershell
-$adbHu20 = 'C:\Users\daver\AppData\Local\Android\Sdk\platform-tools\adb.exe'
-$buildHu20 = 'C:\Users\daver\AppData\Local\Temp\arete-hu20-build\_app'
-& $adbHu20 -s emulator-5554 install -r "$buildHu20\outputs\apk\debug\app-debug.apk"
-& $adbHu20 -s emulator-5554 install -r "$buildHu20\outputs\apk\androidTest\debug\app-debug-androidTest.apk"
-& $adbHu20 -s emulator-5554 shell am instrument -w -r -e class 'com.arete.app.animal.AnimalDetailScreenTest,com.arete.app.animal.AnimalEditorScreenTest,com.arete.app.inventory.InventoryScreenTest' com.arete.app.test/androidx.test.runner.AndroidJUnitRunner
-```
+- [ ] Integrar HU-19 #16; cambiar la base de #17 a main y actualizar sin perder los cambios del equipo.
+- [ ] Revisar/desplegar los tres campos de lectura y repetir peso al nacer/circunferencia contra Render.
+- [ ] Ejecutar pruebas de BD/RLS con la infraestructura de pruebas del equipo y comprobar el check obligatorio de CI.
+- [ ] Validación de Max en HU-61, demostración a Felipe/Scrum Master y aprobación del PR.
 
-Revisa `OK (... tests)` o `FAILURES`; el código de salida de ADB no basta.
-
-## Integración pendiente con el equipo
-
-- HU-17: consulta autorizada de la ficha por ID y rancho, catálogo/contrato de datos y errores.
-- HU-33/HU-36: último peso y medición de circunferencia disponibles, fechas y reglas de selección.
-- HU-05/HU-44: acceso autorizado a fotografías; actualmente se usa la copia local.
-- Sesión real, permisos de lectura/edición y aislamiento validados en el servidor.
-- Conexión con Room/sincronización HU-41/HU-42 cuando el equipo defina esa integración.
-- Revisión por Emmanuel, demostración al Scrum Master y demás Definition of Done.
-
-No se marca la HU como 100 % terminada por pasar pruebas con datos locales.
+Los cuatro criterios de presentación conservan su comprobación. La tarjeta sigue en Code Review y el PR en Draft; no se marca Hecho mientras estos pendientes sigan abiertos.

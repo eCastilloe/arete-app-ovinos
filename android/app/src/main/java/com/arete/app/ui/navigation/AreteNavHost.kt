@@ -57,9 +57,13 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
             arguments = listOf(navArgument(AppRoutes.ARG_ANIMAL_ID) { type = NavType.StringType })
         ) { entry ->
             val refresh by entry.savedStateHandle.getStateFlow("detailRefresh", 0L).collectAsState()
+            val backLabel = remember {
+                if (navController.previousBackStackEntry?.destination?.route == AppRoutes.HOME)
+                    "Volver a Inicio" else "Volver al inventario"
+            }
             AnimalDetailScreen(onBack = { navController.popBackStack() },
                 onHome = { navController.navigate(AppRoutes.HOME) { popUpTo(navController.graph.id) { inclusive = true }; launchSingleTop = true } },
-                onEdit = { id -> navController.navigate(AppRoutes.animalEditor(id)) }, refreshKey = refresh)
+                onEdit = { id -> navController.navigate(AppRoutes.animalEditor(id)) }, refreshKey = refresh, backLabel = backLabel)
         }
         composable(AppRoutes.ANIMAL_EDITOR, arguments = listOf(navArgument("animalId") { defaultValue = "" })) {
             val backLabel = remember {
