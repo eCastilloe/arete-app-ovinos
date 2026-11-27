@@ -7,6 +7,9 @@ Rutas:
   PUT / PATCH / DELETE /partos/{id}    siempre 403: un parto guardado no se toca (CA-06.4).
                                        Las correcciones van por el panel de la Asociación (HU-28).
 Los códigos OVxxx de los triggers los traduce el manejador global de app/main.py.
+
+validar_madre_y_semental, insertar_parto_y_crias, insertar_fotos y detalle_parto también
+los usa el alta extemporánea (HU-29, app/routers/correcciones.py).
 """
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
@@ -15,7 +18,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import text
 
 from app.deps import DbUsuario, validar_rancho
-from app.schemas.parto import PartoCrear, PartoResumen, PartoSalida
+from app.schemas.parto import FotoCrear, PartoCrear, PartoResumen, PartoSalida
 
 router = APIRouter(tags=["Partos"])
 
@@ -25,7 +28,8 @@ BLOQUEADO = "El parto está bloqueado. Solo la Asociación o el Técnico pueden 
 
 PARTO_SQL = """
 SELECT p.id, p.rancho_id, p.madre_id, m.folio AS madre_folio, p.fecha_parto, p.tipo_parto,
-       p.crias_nacidas, p.crias_vivas, p.estado, p.alta_extemporanea, p.evento_reproductivo_id
+       p.crias_nacidas, p.crias_vivas, p.estado, p.alta_extemporanea, p.evento_reproductivo_id,
+       p.correccion_origen_id
   FROM parto p
   JOIN animal m ON m.id = p.madre_id
  WHERE p.eliminado_en IS NULL
@@ -40,7 +44,7 @@ def texto_resumen(vivas: int) -> str:
     return f"{vivas} crías vivas — elegibles para arete SINIIGA"
 
 
-def _detalle(conn, parto_id: UUID) -> dict:
+def detalle_parto(conn, parto_id: UUID) -> dict:
     """Con RLS, un parto de otro rancho simplemente no aparece → 404."""
     parto = conn.execute(text(PARTO_SQL + " AND p.id = :id"), {"id": parto_id}).mappings().first()
     if parto is None:
@@ -51,11 +55,14 @@ def _detalle(conn, parto_id: UUID) -> dict:
           LEFT JOIN animal a ON a.id = pc.cria_id
          WHERE pc.parto_id = :p AND pc.eliminado_en IS NULL
          ORDER BY pc.orden"""), {"p": parto_id}).mappings().all()
+    # En un alta extemporánea la evidencia cuelga de la corrección que le dio origen (HU-29).
     fotos = conn.execute(text("""
         SELECT id, ruta, mime, estado_subida
           FROM foto_evidencia
-         WHERE parto_id = :p AND eliminado_en IS NULL
-         ORDER BY creado_en"""), {"p": parto_id}).mappings().all()
+         WHERE eliminado_en IS NULL
+           AND (parto_id = :p OR (CAST(:c AS uuid) IS NOT NULL AND correccion_id = CAST(:c AS uuid)))
+         ORDER BY creado_en"""),
+        {"p": parto_id, "c": parto["correccion_origen_id"]}).mappings().all()
     return dict(parto) | {
         "bloqueado": True,
         "resumen": texto_resumen(parto["crias_vivas"]),
@@ -64,13 +71,8 @@ def _detalle(conn, parto_id: UUID) -> dict:
     }
 
 
-@router.post("/ranchos/{rancho_id}/partos", response_model=PartoSalida,
-             status_code=status.HTTP_201_CREATED,
-             summary="Registrar un parto (madre, crías y foto) en una sola operación")
-def registrar_parto(rancho_id: UUID, datos: PartoCrear, conn: DbUsuario):
-    validar_rancho(conn, rancho_id, "puede_capturar")
-
-    # Mensajes claros antes de llegar a los triggers (CA-06.5)
+def validar_madre_y_semental(conn, rancho_id: UUID, datos: PartoCrear):
+    """Mensajes claros antes de llegar a los triggers (CA-06.5). Devuelve la madre."""
     madre = conn.execute(text("""
         SELECT folio, sexo, situacion, es_externo, raza_id
           FROM animal
@@ -89,7 +91,11 @@ def registrar_parto(rancho_id: UUID, datos: PartoCrear, conn: DbUsuario):
             {"id": datos.semental_id, "r": rancho_id}).scalar()
         if sexo_semental != "M":
             raise HTTPException(422, "El semental debe ser un macho del rancho")
+    return madre
 
+
+def insertar_parto_y_crias(conn, rancho_id: UUID, datos: PartoCrear, madre) -> UUID:
+    """Inserta el parto y sus crías. No inserta fotos: cada flujo decide de quién cuelgan."""
     parto_id = datos.id or uuid4()
     nacidas = len(datos.crias)
     vivas = sum(1 for c in datos.crias if c.nacio_vivo)
@@ -97,6 +103,8 @@ def registrar_parto(rancho_id: UUID, datos: PartoCrear, conn: DbUsuario):
 
     # 1) Parto. Los triggers validan la ventana del mes (OV002), la madre y el intervalo
     #    entre partos (OV006), lo ligan al empadre abierto y pasan a la madre a lactancia.
+    #    Con una corrección de alta extemporánea activa, el trigger no aplica la ventana
+    #    y marca alta_extemporanea = true (HU-29).
     conn.execute(text("""
         INSERT INTO parto (id, rancho_id, madre_id, fecha_parto, crias_nacidas, crias_vivas,
                            asistido, capturado_en, observaciones)
@@ -132,22 +140,42 @@ def registrar_parto(rancho_id: UUID, datos: PartoCrear, conn: DbUsuario):
             {"r": rancho_id, "parto": parto_id, "orden": orden, "sexo": cria.sexo,
              "peso": cria.peso_nacimiento_kg, "vivo": cria.nacio_vivo, "cria": cria_id,
              "obs": cria.observaciones})
+    return parto_id
 
-    # 3) Metadatos de la foto; los bytes se suben después al bucket (HU-05).
-    for foto in datos.fotos:
+
+def insertar_fotos(conn, rancho_id: UUID, fotos: list[FotoCrear], *,
+                   parto_id: UUID | None = None, correccion_id: UUID | None = None) -> None:
+    """Metadatos de las fotos; los bytes se suben después al bucket (HU-05).
+
+    Cada foto pertenece a UN solo registro (CHECK foto_un_solo_dueno): al parto o a la corrección.
+    """
+    if (parto_id is None) == (correccion_id is None):
+        raise ValueError("La foto debe pertenecer a un parto o a una corrección, no a ambos")
+    carpeta = f"partos/{parto_id}" if parto_id else f"correcciones/{correccion_id}"
+    for foto in fotos:
         foto_id = foto.id or uuid4()
         conn.execute(text("""
-            INSERT INTO foto_evidencia (id, rancho_id, parto_id, ruta, sha256, mime, bytes,
-                                        tomada_en, estado_subida)
-            VALUES (:id, :r, :parto, :ruta, :sha, :mime, :bytes, :tomada, 'pendiente')"""),
-            {"id": foto_id, "r": rancho_id, "parto": parto_id,
-             "ruta": f"rancho/{rancho_id}/partos/{parto_id}/{foto_id}.{EXTENSION[foto.mime]}",
+            INSERT INTO foto_evidencia (id, rancho_id, parto_id, correccion_id, ruta, sha256,
+                                        mime, bytes, tomada_en, estado_subida)
+            VALUES (:id, :r, :parto, :correccion, :ruta, :sha, :mime, :bytes, :tomada, 'pendiente')"""),
+            {"id": foto_id, "r": rancho_id, "parto": parto_id, "correccion": correccion_id,
+             "ruta": f"rancho/{rancho_id}/{carpeta}/{foto_id}.{EXTENSION[foto.mime]}",
              "sha": foto.sha256, "mime": foto.mime, "bytes": foto.tamano_bytes,
              "tomada": foto.tomada_en})
 
-    # 4) Revisa ahora (no en el COMMIT) que crías, foto y fichas cuadren: OV003, OV004, OV005.
+
+@router.post("/ranchos/{rancho_id}/partos", response_model=PartoSalida,
+             status_code=status.HTTP_201_CREATED,
+             summary="Registrar un parto (madre, crías y foto) en una sola operación")
+def registrar_parto(rancho_id: UUID, datos: PartoCrear, conn: DbUsuario):
+    validar_rancho(conn, rancho_id, "puede_capturar")
+    madre = validar_madre_y_semental(conn, rancho_id, datos)
+    parto_id = insertar_parto_y_crias(conn, rancho_id, datos, madre)
+    insertar_fotos(conn, rancho_id, datos.fotos, parto_id=parto_id)
+
+    # Revisa ahora (no en el COMMIT) que crías, foto y fichas cuadren: OV003, OV004, OV005.
     conn.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
-    return _detalle(conn, parto_id)
+    return detalle_parto(conn, parto_id)
 
 
 @router.get("/ranchos/{rancho_id}/partos", response_model=list[PartoResumen])
@@ -163,13 +191,13 @@ def listar_partos(rancho_id: UUID, conn: DbUsuario,
 
 @router.get("/partos/{parto_id}", response_model=PartoSalida)
 def obtener_parto(parto_id: UUID, conn: DbUsuario):
-    detalle = _detalle(conn, parto_id)
+    detalle = detalle_parto(conn, parto_id)
     validar_rancho(conn, detalle["rancho_id"])
     return detalle
 
 
 def _rechazar(conn, parto_id: UUID):
-    detalle = _detalle(conn, parto_id)          # 404 si no existe o es de otro rancho
+    detalle = detalle_parto(conn, parto_id)     # 404 si no existe o es de otro rancho
     validar_rancho(conn, detalle["rancho_id"])
     raise HTTPException(status.HTTP_403_FORBIDDEN, BLOQUEADO)
 
