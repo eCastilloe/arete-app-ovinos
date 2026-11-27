@@ -47,7 +47,10 @@ data class AnimalDetailDto(
     @SerializedName("nacimiento_bloqueado") val birthLocked: Boolean = false,
     @SerializedName("situacion") val situation: String = "activo",
     @SerializedName("es_externo") val isExternal: Boolean = false,
-    @SerializedName("ultimo_peso_kg") val lastWeightKg: Double? = null
+    @SerializedName("ultimo_peso_kg") val lastWeightKg: Double? = null,
+    @SerializedName("peso_nacimiento_kg") val birthWeightKg: Double? = null,
+    @SerializedName("ultima_circunferencia_testicular_cm") val circumferenceCm: Double? = null,
+    @SerializedName("fecha_ultima_circunferencia") val circumferenceDate: String? = null
 ) {
     fun toRecord(): AnimalRecord {
         val inventory = InventoryAnimalDto(id, ranchId, folio, siniiga, sex, category, situation,
@@ -60,7 +63,7 @@ data class AnimalDetailDto(
             birthType = AnimalCodes.birthTypes.label(birthType), conception = AnimalCodes.conceptions.label(conception),
             reproductiveState = AnimalCodes.reproductiveStates.label(reproductiveState), destination = AnimalCodes.destinations.label(destination),
             registration = registration.orEmpty(), dna = dna.orEmpty(), breeder = breeder.orEmpty(), owner = owner.orEmpty(), notes = notes.orEmpty()
-        ), version, inventory.situation, lastWeightKg, birthLocked, isExternal)
+        ), version, inventory.situation, lastWeightKg, birthLocked, isExternal, lastTesticularCircumferenceCm = circumferenceCm)
     }
     private fun parent(id: String?, folio: String?, external: Boolean) = when {
         id == null -> ParentChoice()

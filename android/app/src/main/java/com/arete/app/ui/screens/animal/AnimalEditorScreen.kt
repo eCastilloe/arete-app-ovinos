@@ -39,7 +39,8 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun AnimalEditorScreen(onBack: () -> Unit, onSaved: (String) -> Unit,
-    viewModel: AnimalEditorViewModel = viewModel(factory = AnimalEditorViewModel.Factory)) {
+    viewModel: AnimalEditorViewModel = viewModel(factory = AnimalEditorViewModel.Factory),
+    backLabel: String = "Volver al inventario") {
     val state by viewModel.state.collectAsState()
     val app = LocalContext.current.applicationContext as AreteApplication
     var cameraUri by rememberSaveable { mutableStateOf<String?>(null) }
@@ -55,7 +56,7 @@ fun AnimalEditorScreen(onBack: () -> Unit, onSaved: (String) -> Unit,
             val uri = app.container.animalPhotoStore.cameraUri()
             cameraUri = uri.toString()
             camera.launch(uri)
-        }.onFailure { viewModel.photoError() } })
+        }.onFailure { viewModel.photoError() } }, backLabel = backLabel)
 }
 
 @Composable
@@ -63,7 +64,8 @@ internal fun AnimalEditorContent(
     state: AnimalEditorState,
     onChange: (AnimalField, (AnimalForm) -> AnimalForm) -> Unit,
     onSex: (AnimalSex) -> Unit, onStep: (Int) -> Unit, onSave: () -> Unit,
-    onRetry: () -> Unit, onBack: () -> Unit, onChoosePhoto: () -> Unit = {}, onCamera: () -> Unit = {}
+    onRetry: () -> Unit, onBack: () -> Unit, onChoosePhoto: () -> Unit = {}, onCamera: () -> Unit = {},
+    backLabel: String = "Volver al inventario"
 ) {
     val context = state.context
     val form = state.form
@@ -188,7 +190,7 @@ internal fun AnimalEditorContent(
                     }
                 }
                 TextButton(onClick = back, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                    Text("Volver al inventario", style = MaterialTheme.typography.labelLarge)
+                    Text(backLabel, style = MaterialTheme.typography.labelLarge)
                 }
             }
         }

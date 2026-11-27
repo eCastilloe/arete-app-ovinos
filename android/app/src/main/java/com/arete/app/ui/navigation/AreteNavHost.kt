@@ -47,24 +47,34 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
         }
         composable(AppRoutes.INVENTORY) { entry ->
             val refresh by entry.savedStateHandle.getStateFlow("inventoryRefresh", 0L).collectAsState()
-            InventoryScreen(onHome = { navController.navigate(AppRoutes.HOME) { popUpTo(AppRoutes.INVENTORY) { inclusive = true }; launchSingleTop = true } },
+            InventoryScreen(onHome = { navController.navigate(AppRoutes.HOME) { popUpTo(navController.graph.id) { inclusive = true }; launchSingleTop = true } },
                 onAdd = { navController.navigate(AppRoutes.animalEditor()) },
-                onEdit = { id -> navController.navigate(AppRoutes.animalEditor(id)) }, refreshKey = refresh)
+                onOpen = { id -> navController.navigate(AppRoutes.animalDetail(id)) }, refreshKey = refresh)
         }
-        composable(AppRoutes.ANIMAL_EDITOR, arguments = listOf(navArgument("animalId") { defaultValue = "" })) {
-            AnimalEditorScreen(onBack = { navController.popBackStack() }, onSaved = {
-                navController.previousBackStackEntry?.savedStateHandle?.set("inventoryRefresh", System.nanoTime())
-                navController.popBackStack()
-            })
-        }
+        // Ficha del animal (HU-20). La abren el inventario y "Leer arete" (HU-53) por la misma ruta.
         composable(
             route = AppRoutes.ANIMAL_DETAIL,
             arguments = listOf(navArgument(AppRoutes.ARG_ANIMAL_ID) { type = NavType.StringType })
         ) { entry ->
-            AnimalDetailScreen(
-                animalId = entry.arguments?.getString(AppRoutes.ARG_ANIMAL_ID).orEmpty(),
-                onBack = { navController.popBackStack() }
-            )
+            val refresh by entry.savedStateHandle.getStateFlow("detailRefresh", 0L).collectAsState()
+            val backLabel = remember {
+                if (navController.previousBackStackEntry?.destination?.route == AppRoutes.HOME)
+                    "Volver a Inicio" else "Volver al inventario"
+            }
+            AnimalDetailScreen(onBack = { navController.popBackStack() },
+                onHome = { navController.navigate(AppRoutes.HOME) { popUpTo(navController.graph.id) { inclusive = true }; launchSingleTop = true } },
+                onEdit = { id -> navController.navigate(AppRoutes.animalEditor(id)) }, refreshKey = refresh, backLabel = backLabel)
+        }
+        composable(AppRoutes.ANIMAL_EDITOR, arguments = listOf(navArgument("animalId") { defaultValue = "" })) {
+            val backLabel = remember {
+                if (navController.previousBackStackEntry?.destination?.route == AppRoutes.ANIMAL_DETAIL)
+                    "Volver a la ficha" else "Volver al inventario"
+            }
+            AnimalEditorScreen(onBack = { navController.popBackStack() }, onSaved = {
+                runCatching { navController.getBackStackEntry(AppRoutes.INVENTORY) }.getOrNull()?.savedStateHandle?.set("inventoryRefresh", System.nanoTime())
+                navController.previousBackStackEntry?.savedStateHandle?.set("detailRefresh", System.nanoTime())
+                navController.popBackStack()
+            }, backLabel = backLabel)
         }
     }
 

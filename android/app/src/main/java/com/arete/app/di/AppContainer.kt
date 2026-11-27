@@ -18,6 +18,8 @@ import com.arete.app.data.repository.AuthRepository
 import com.arete.app.data.repository.SyncRepository
 import com.arete.app.data.repository.InventoryRepositoryFactory
 import com.arete.app.data.repository.AnimalEditorRepositoryFactory
+import com.arete.app.data.repository.AnimalDetailRepositoryFactory
+import com.arete.app.data.repository.RemoteAnimalDetailRepository
 import com.arete.app.data.local.AnimalPhotoStore
 import com.arete.app.alerts.AlertDataSourceFactory
 import com.arete.app.alerts.AlertRunner
@@ -76,6 +78,11 @@ class AppContainer(context: Context) {
         authRepository.getRanches()
     }, animalPhotoStore::find, animalPhotoStore::associate)
     val animalEditorRepository = AnimalEditorRepositoryFactory.create(context, tokenStorage, remoteAnimalEditor)
+    val animalDetailRepository = AnimalDetailRepositoryFactory.create(context, tokenStorage,
+        RemoteAnimalDetailRepository(animalApiService, {
+            authRepository.validateSession().getOrThrow()
+            authRepository.getRanches()
+        }, animalPhotoStore::find))
     // HU-54 cambia solo esta línea por el lector NFC/QR real.
     val lectorArete: LectorArete = SimulatedLectorArete()
 

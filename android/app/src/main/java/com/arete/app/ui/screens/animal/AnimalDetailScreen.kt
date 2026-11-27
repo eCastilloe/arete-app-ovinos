@@ -1,55 +1,157 @@
 package com.arete.app.ui.screens.animal
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.arete.app.data.model.*
+import com.arete.app.ui.components.AreteButton
 import com.arete.app.ui.components.AreteSecondaryButton
-import com.arete.app.ui.theme.AreteTheme
+import com.arete.app.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.Locale
 
-/**
- * Ficha PROVISIONAL (HU-53). Solo demuestra que la lectura abre la ficha.
- * La ficha real la hace Marvin en HU-19 y reemplaza este archivo,
- * conservando la ruta `animal/{animalId}`.
- */
 @Composable
-fun AnimalDetailScreen(
-    animalId: String,
-    onBack: () -> Unit
-) {
-    Scaffold { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(text = "Ficha del animal", style = MaterialTheme.typography.headlineLarge)
-            Text(text = "Identificador: $animalId", style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text = "Esta ficha es provisional. La ficha completa llega con la HU-19.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            AreteSecondaryButton(text = "Volver", onClick = onBack)
+fun AnimalDetailScreen(onBack: () -> Unit, onHome: () -> Unit, onEdit: (String) -> Unit,
+    refreshKey: Long = 0L, backLabel: String = "Volver al inventario",
+    viewModel: AnimalDetailViewModel = viewModel(factory = AnimalDetailViewModel.Factory)) {
+    val state by viewModel.state.collectAsState()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle, viewModel) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) viewModel.reload() }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(refreshKey) { if (refreshKey != 0L) viewModel.reload() }
+    AnimalDetailContent(state, viewModel::reload, onBack, onHome, onEdit, backLabel)
+}
+
+@Composable
+internal fun AnimalDetailContent(state: AnimalDetailState, onRetry: () -> Unit, onBack: () -> Unit,
+    onHome: () -> Unit, onEdit: (String) -> Unit, backLabel: String = "Volver al inventario") {
+    val detail = state.detail
+    val scroll = rememberScrollState()
+    Scaffold(bottomBar = {
+        Column(Modifier.fillMaxWidth().background(Paper).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            AreteSecondaryButton(backLabel, onBack, Modifier.testTag("detail-back"))
+        }
+    }) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+            Column(Modifier.widthIn(max = 600.dp).fillMaxWidth().verticalScroll(scroll).testTag("detail-scroll").padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Ficha del animal", style = MaterialTheme.typography.headlineLarge,
+                    modifier = Modifier.semantics { heading() })
+                when {
+                    state.loading -> {
+                        CircularProgressIndicator()
+                        Text("Cargando ficha…", style = MaterialTheme.typography.bodyLarge)
+                    }
+                    state.error != null -> {
+                        Text(state.error, color = AlertText, style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.testTag("detail-error"))
+                        AreteButton("Intentar de nuevo", onRetry, Modifier.testTag("detail-retry"))
+                    }
+                    detail != null -> {
+                        val animal = detail.animal
+                        val form = animal.form
+                        val female = form.sex == AnimalSex.FEMALE
+                        val ink = if (female) FemaleText else MaleText
+                        Text(detail.ranchName, style = MaterialTheme.typography.titleMedium)
+                        if (detail.isDemo) Text("Modo de prueba · datos de ejemplo", style = MaterialTheme.typography.bodySmall)
+                        Column(Modifier.fillMaxWidth().background(if (female) FemaleBackground else MaleBackground,
+                            MaterialTheme.shapes.medium).testTag(if (female) "detail-female" else "detail-male").padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Arete ${form.folio}", color = ink, style = MaterialTheme.typography.displayMedium)
+                            Text(if (female) "♀ Hembra" else "♂ Macho", color = ink, style = MaterialTheme.typography.titleMedium)
+                            Text("${form.breed.ifBlank { "Raza sin registrar" }} · ${form.color.ifBlank { "Color sin registrar" }}", color = ink, style = MaterialTheme.typography.bodyLarge)
+                            val age = animalAge(parseBirthDate(form.birthDate), state.onDate)?.label ?: "Edad no disponible"
+                            Text(if (form.approximateDate && age != "Edad no disponible") "$age (aproximada)" else age,
+                                color = ink, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.testTag("detail-age"))
+                            Text("Nacimiento: ${form.birthDate.ifBlank { "Sin registrar" }}", color = ink,
+                                style = MaterialTheme.typography.bodyMedium)
+                        }
+                        if (form.siniiga.isNotBlank()) Text("SINIIGA ${form.siniiga}", color = Ink,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.fillMaxWidth().background(Siniiga).padding(12.dp))
+                        DetailValue("Categoría", form.category.label)
+                        DetailValue("Situación", animal.situation.label)
+                        if (female) DetailValue("Estado reproductivo", form.reproductiveState)
+                        else DetailValue("Destino", form.destination)
+                        DetailValue("Último peso", detail.displayWeightKg
+                            ?.let { "${decimal(it)} kg${if (detail.usesBirthWeight) " (al nacer)" else ""}" } ?: "Sin pesaje")
+                        if (!female) DetailValue("Circunferencia testicular", animal.lastTesticularCircumferenceCm
+                            ?.takeIf { it.isFinite() && it > 0 && it < 60 }?.let { "${decimal(it)} cm" } ?: "Sin registrar",
+                            Modifier.testTag("detail-circumference"))
+                        if (!female && animal.lastTesticularCircumferenceCm != null && detail.circumferenceDate != null)
+                            DetailValue("Fecha de la medición", runCatching { java.time.LocalDate.parse(detail.circumferenceDate).format(BirthDateFormat) }.getOrDefault("Sin registrar"))
+                        HorizontalDivider(color = Line)
+                        Text("Foto", style = MaterialTheme.typography.titleLarge)
+                        DetailPhoto(form.photoPath)
+                        if (form.photoPath != null && !detail.isDemo) Text("Foto guardada en este celular", style = MaterialTheme.typography.bodySmall)
+                        HorizontalDivider(color = Line)
+                        Text("Origen y registro", style = MaterialTheme.typography.titleLarge)
+                        DetailValue("Motivo de ingreso", detail.entryReasonLabel)
+                        DetailValue("Madre", detail.motherLabel)
+                        DetailValue("Semental", detail.fatherLabel)
+                        DetailValue("Tipo de parto", form.birthType)
+                        DetailValue("Concepción", form.conception)
+                        DetailValue("Registro UNO", form.registration)
+                        DetailValue("ADN", form.dna)
+                        DetailValue("Criador", form.breeder)
+                        DetailValue("Propietario actual", form.owner)
+                        if (form.notes.isNotBlank()) DetailValue("Notas", form.notes)
+                        if (detail.canEdit) AreteButton("Editar ficha", { onEdit(animal.id) }, Modifier.testTag("detail-edit"))
+                    }
+                }
+                AreteSecondaryButton("Ir a Inicio", onHome, Modifier.testTag("detail-home"))
+            }
         }
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFFEEF0EA)
 @Composable
-private fun AnimalDetailScreenPreview() {
-    AreteTheme {
-            AnimalDetailScreen(animalId = "00000000-0000-4000-8000-000000000001", onBack = {})
+private fun DetailValue(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge)
+        Text(value.ifBlank { "Sin registrar" }, style = MaterialTheme.typography.bodyLarge)
     }
 }
+
+@Composable
+private fun DetailPhoto(path: String?) {
+    val photo by produceState<Bitmap?>(null, path) {
+        value = null
+        value = withContext(Dispatchers.IO) {
+            path?.let { runCatching {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(it, bounds)
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1200) sample *= 2
+                BitmapFactory.decodeFile(it, BitmapFactory.Options().apply { inSampleSize = sample })
+            }.getOrNull() }
+        }
+    }
+    val bitmap = photo
+    if (bitmap != null) Image(bitmap.asImageBitmap(), "Foto del animal",
+        Modifier.fillMaxWidth().height(220.dp).testTag("detail-photo"))
+    else Text(if (path == null) "Sin foto" else "Foto no disponible", style = MaterialTheme.typography.bodyLarge)
+}
+
+private fun decimal(number: Double) = String.format(Locale.forLanguageTag("es-MX"), "%.1f", number)

@@ -40,7 +40,8 @@ enum class AnimalField(val step: Int) {
 data class AnimalRecord(
     val id: String, val ranchId: String, val form: AnimalForm, val version: Int = 1,
     val situation: AnimalSituation = AnimalSituation.ACTIVE, val lastWeightKg: Double? = null,
-    val birthLocked: Boolean = false, val isExternal: Boolean = false, val isDeleted: Boolean = false
+    val birthLocked: Boolean = false, val isExternal: Boolean = false, val isDeleted: Boolean = false,
+    val lastTesticularCircumferenceCm: Double? = null
 ) {
     fun toInventory() = InventoryAnimal(id, ranchId, form.folio, form.siniiga.ifBlank { null },
         form.sex, form.category, situation, form.breed, form.reproductiveState.ifBlank { null },
