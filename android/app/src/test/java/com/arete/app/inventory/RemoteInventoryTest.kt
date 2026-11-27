@@ -98,6 +98,17 @@ class RemoteInventoryTest {
         assertEquals(1, calls)
     }
 
+    @Test fun sessionRanchesSelectInventoryWithoutFetchingAnotherProfile() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val repository = RemoteInventoryRepository(api { request ->
+            requests.add(request)
+            200 to page()
+        }, { com.arete.app.auth.testUser().ranches })
+        assertEquals("ranch-1", repository.load().ranchId)
+        assertEquals(1, requests.size)
+        assertEquals("/ranchos/ranch-1/animales", requests.single().url.encodedPath)
+    }
+
     @Test fun realEmptyInventoryHasNoDemoAnimals() = runBlocking {
         val repository = RemoteInventoryRepository(api { 200 to if (it.url.encodedPath == "/auth/yo") userJson else page("", 0) })
         val snapshot = repository.load()

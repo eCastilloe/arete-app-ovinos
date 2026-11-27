@@ -61,6 +61,7 @@ class LiveInventoryTest {
             }
             var searchMillis: Long? = null
             ActivityScenario.launch(MainActivity::class.java).use {
+                compose.onNodeWithText("Inicio").performClick()
                 compose.onNodeWithText("Leer arete").assertIsDisplayed().assertHeightIsAtLeast(56.dp)
                 compose.onNodeWithText("Ver inventario").assertHeightIsAtLeast(56.dp).performClick()
                 compose.waitUntil(65_000) {
@@ -166,6 +167,7 @@ class LiveInventoryTest {
         runBlocking { container.authRepository.saveDemoSession() }
         try {
             ActivityScenario.launch(MainActivity::class.java).use {
+                compose.onNodeWithText("Inicio").performClick()
                 compose.onNodeWithText("Leer arete").assertHeightIsAtLeast(56.dp).performClick()
                 compose.waitUntil(5_000) { compose.onAllNodesWithText("Ficha del animal").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithText("Identificador: 00000000-0000-4000-8000-000000000001").assertIsDisplayed()

@@ -2,18 +2,23 @@ package com.arete.app.data.repository
 
 import com.arete.app.data.model.InventorySnapshot
 import com.arete.app.data.remote.ApiService
+import com.arete.app.data.remote.dto.RanchAccessDto
 import retrofit2.HttpException
 
 class NoAssignedRanchException : Exception()
 class IncompleteInventoryException : Exception()
 
 /** HU-18: selects the first authorized ranch; multi-ranch selection belongs to HU-14. */
-class RemoteInventoryRepository(private val apiService: ApiService) : InventoryRepository {
-    override suspend fun load(): InventorySnapshot {
+class RemoteInventoryRepository(
+    private val apiService: ApiService,
+    private val ranches: suspend () -> List<RanchAccessDto> = {
         val userResponse = apiService.getCurrentUser()
         if (!userResponse.isSuccessful) throw HttpException(userResponse)
-        val user = requireNotNull(userResponse.body())
-        val ranch = user.ranches.firstOrNull() ?: throw NoAssignedRanchException()
+        requireNotNull(userResponse.body()).ranches
+    }
+) : InventoryRepository {
+    override suspend fun load(): InventorySnapshot {
+        val ranch = ranches().firstOrNull() ?: throw NoAssignedRanchException()
         val page = apiService.getInventory(ranch.ranchId)
         // Do not publish partial/wrong-ranch counts as a complete inventory.
         check(page.ranchId == ranch.ranchId)

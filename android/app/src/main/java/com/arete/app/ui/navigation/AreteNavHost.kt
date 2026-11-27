@@ -9,7 +9,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.navigation.navArgument
 import android.net.Uri
 import com.arete.app.ui.screens.animal.AnimalEditorScreen
 import androidx.compose.ui.Modifier
@@ -35,7 +34,7 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
     }
 
     val navController = rememberNavController()
-    val startDestination = remember { if (isLoggedIn) AppRoutes.HOME else AppRoutes.LOGIN }
+    val startDestination = remember { if (isLoggedIn) AppRoutes.INVENTORY else AppRoutes.LOGIN }
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable(AppRoutes.LOGIN) { LoginScreen() }
@@ -49,7 +48,7 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
         }
         composable(AppRoutes.INVENTORY) { entry ->
             val refresh by entry.savedStateHandle.getStateFlow("inventoryRefresh", 0L).collectAsState()
-            InventoryScreen(onHome = { navController.popBackStack(AppRoutes.HOME, false) },
+            InventoryScreen(onHome = { navController.navigate(AppRoutes.HOME) { popUpTo(AppRoutes.INVENTORY) { inclusive = true }; launchSingleTop = true } },
                 onAdd = { navController.navigate("animal-editor") },
                 onEdit = { id -> navController.navigate("animal-editor?animalId=${Uri.encode(id)}") }, refreshKey = refresh)
         }
@@ -80,7 +79,7 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
             currentRoute != AppRoutes.LOGIN
         }
         if (needsRedirect) {
-            val target = if (isLoggedIn) AppRoutes.HOME else AppRoutes.LOGIN
+            val target = if (isLoggedIn) AppRoutes.INVENTORY else AppRoutes.LOGIN
             navController.navigate(target) {
                 popUpTo(navController.graph.id) { inclusive = true }
                 launchSingleTop = true

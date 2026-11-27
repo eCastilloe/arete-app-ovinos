@@ -8,11 +8,11 @@ import java.io.File
 
 // This entire source set is excluded from release builds. No real ranch is changed.
 object InventoryRepositoryFactory {
-    fun create(context: Context, tokenStorage: TokenStorage, apiService: ApiService): InventoryRepository {
+    fun create(context: Context, tokenStorage: TokenStorage, apiService: ApiService, authRepository: AuthRepository): InventoryRepository {
         val demo = createDemoAnimals(context, tokenStorage)
-        val remote = RemoteInventoryRepository(apiService)
+        val remote = RemoteInventoryRepository(apiService, authRepository::getRanches)
         return InventoryRepository {
-            if (tokenStorage.getToken() == "demo-token") demo.load() else remote.load()
+            if (tokenStorage.getSession()?.isDemo == true) demo.load() else remote.load()
         }
     }
 }
@@ -22,7 +22,7 @@ object AnimalEditorRepositoryFactory {
 }
 
 private fun createDemoAnimals(context: Context, tokens: TokenStorage) = DemoAnimalRepository(
-    File(context.filesDir, "hu19-demo/animals.json"), isDemoSession = { tokens.getToken() == "demo-token" }
+    File(context.filesDir, "hu19-demo/animals.json"), isDemoSession = { tokens.getSession()?.isDemo == true }
 )
 
 object DemoInventoryData {
