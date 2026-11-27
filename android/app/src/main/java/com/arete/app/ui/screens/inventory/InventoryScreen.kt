@@ -36,9 +36,11 @@ import com.arete.app.ui.theme.*
 import java.util.Locale
 
 @Composable
-fun InventoryScreen(onHome: () -> Unit, viewModel: InventoryViewModel = viewModel(factory = InventoryViewModel.Factory)) {
+fun InventoryScreen(onHome: () -> Unit, viewModel: InventoryViewModel = viewModel(factory = InventoryViewModel.Factory),
+    onAdd: (() -> Unit)? = null, onEdit: ((String) -> Unit)? = null, refreshKey: Long = 0L) {
     val state by viewModel.state.collectAsState()
-    InventoryContent(state, viewModel::search, viewModel::selectCategory, viewModel::toggleDischarged, viewModel::retry, onHome)
+    LaunchedEffect(refreshKey) { if (refreshKey != 0L) viewModel.retry() }
+    InventoryContent(state, viewModel::search, viewModel::selectCategory, viewModel::toggleDischarged, viewModel::retry, onHome, onAdd, onEdit)
 }
 
 @Composable
@@ -48,7 +50,9 @@ internal fun InventoryContent(
     onCategory: (InventoryCategory) -> Unit,
     onDischarged: () -> Unit,
     onRetry: () -> Unit,
-    onHome: () -> Unit
+    onHome: () -> Unit,
+    onAdd: (() -> Unit)? = null,
+    onEdit: ((String) -> Unit)? = null
 ) {
     val listState = rememberLazyListState()
     val contentFocus = remember { FocusRequester() }
@@ -109,6 +113,9 @@ internal fun InventoryContent(
                     }
                 }
                 else -> {
+                    if (state.canEdit && onAdd != null) item(key = "add-animal", contentType = "controls") {
+                        AreteButton("Agregar animal", { finishTyping(); onAdd() }, Modifier.testTag("add-animal"))
+                    }
                     item(key = "search", contentType = "controls") {
                         OutlinedTextField(
                             value = state.filters.query, onValueChange = onQuery,
@@ -176,7 +183,7 @@ internal fun InventoryContent(
                         }, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("inventory-empty"))
                     }
                     items(state.animals, key = { it.id }, contentType = { "animal" }) { animal ->
-                        AnimalRow(animal)
+                        AnimalRow(animal, if (state.canEdit) onEdit else null)
                     }
                 }
             }
@@ -185,7 +192,7 @@ internal fun InventoryContent(
 }
 
 @Composable
-private fun AnimalRow(animal: InventoryAnimal) {
+private fun AnimalRow(animal: InventoryAnimal, onEdit: ((String) -> Unit)?) {
     Column(Modifier.fillMaxWidth().testTag("animal-${animal.id}"), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             AnimalTag(animal, Modifier.width(118.dp))
@@ -201,6 +208,7 @@ private fun AnimalRow(animal: InventoryAnimal) {
             Text("SINIIGA $number", style = MaterialTheme.typography.bodySmall, color = Ink,
                 modifier = Modifier.background(Siniiga, MaterialTheme.shapes.extraSmall).padding(horizontal = 8.dp, vertical = 4.dp))
         }
+        if (onEdit != null) AreteSecondaryButton("Editar ficha · ${animal.folio}", { onEdit(animal.id) }, Modifier.testTag("edit-${animal.id}"))
         HorizontalDivider(color = Line)
     }
 }

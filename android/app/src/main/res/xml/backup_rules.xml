@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!-- La sesión pertenece a este dispositivo; no se restaura desde una copia. -->
-    <exclude domain="file" path="datastore/session.preferences_pb" />
-    <!-- Los avisos ya mostrados (HU-39) son de esta sesión; restaurarlos ocultaría avisos pendientes. -->
-    <exclude domain="sharedpref" path="avisos.xml" />
+        <exclude domain="file" path="hu19-demo/" />
+        <exclude domain="file" path="animal-photos/" />
+        <exclude domain="file" path="datastore/session.preferences_pb" />
+        <exclude domain="sharedpref" path="avisos.xml" />
+        <exclude domain="sharedpref" path="animal_photos.xml" />
 </full-backup-content>

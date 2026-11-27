@@ -29,7 +29,8 @@ class RemoteInventoryRepository(
         return InventorySnapshot(
             ranchId = ranch.ranchId,
             ranchName = page.ranchName,
-            animals = page.items.map { it.toInventoryAnimal() }
+            animals = page.items.map { it.toInventoryAnimal() },
+            canEdit = ranch.canEdit && page.canEdit
         )
     }
 }

@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="file" path="hu19-demo/" />
+        <exclude domain="file" path="animal-photos/" />
         <exclude domain="file" path="datastore/session.preferences_pb" />
-        <!-- Avisos ya mostrados (HU-39): igual que la sesión, se quedan en este dispositivo. -->
         <exclude domain="sharedpref" path="avisos.xml" />
+        <exclude domain="sharedpref" path="animal_photos.xml" />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="file" path="hu19-demo/" />
+        <exclude domain="file" path="animal-photos/" />
         <exclude domain="file" path="datastore/session.preferences_pb" />
         <exclude domain="sharedpref" path="avisos.xml" />
+        <exclude domain="sharedpref" path="animal_photos.xml" />
     </device-transfer>
 </data-extraction-rules>
