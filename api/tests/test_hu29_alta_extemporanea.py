@@ -1,4 +1,4 @@
-"""HU-29 · Alta extemporánea. Las pruebas @bd necesitan la rama dev de Neon (.env)."""
+"""HU-29 · Alta extemporánea. Las pruebas @bd necesitan la rama dev de Neon (.env con arete_api)."""
 import hashlib
 import os
 from datetime import timedelta
@@ -11,7 +11,8 @@ from app.db import engine
 from app.schemas.animal import hoy_jalisco
 from app.schemas.parto import AltaExtemporaneaCrear
 from tests.utilidades import (
-    bd, client, crear_asociacion_con_tecnico, crear_rancho_con_productor, encabezados, sufijo,
+    bd, client, como, crear_asociacion_con_tecnico, crear_rancho_con_productor, encabezados,
+    sufijo,
 )
 
 MOTIVO = "El productor reportó el parto tarde por falta de señal en el rancho"
@@ -53,7 +54,7 @@ def d():
     aso = crear_asociacion_con_tecnico("tecnico")
     otra = crear_asociacion_con_tecnico("tecnico")        # técnico de OTRA asociación
     r = crear_rancho_con_productor("Rancho HU-29")
-    with engine.begin() as conn:
+    with engine.begin() as conn:                          # rancho no tiene RLS
         conn.execute(text("UPDATE rancho SET asociacion_id = :a WHERE id = :r"),
                      {"a": aso["asociacion_id"], "r": r["rancho_id"]})
     return {"rancho": r["rancho_id"], "tecnico_id": aso["tecnico_id"],
@@ -85,13 +86,15 @@ def test_tecnico_da_de_alta_parto_de_mes_cerrado(d):  # CA-07.3
     assert p["aprobada_por"] == d["tecnico_id"] and p["motivo"] == MOTIVO
     assert p["crias_nacidas"] == 2 and p["crias_vivas"] == 1
     assert len(p["fotos"]) == 1 and "/correcciones/" in p["fotos"][0]["ruta"]
+    assert p["fotos"][0]["estado_subida"] == "pendiente"   # los bytes se suben con HU-05
 
     # La marca se ve también en el detalle normal del parto (CA-07.3)
     det = client.get(f"/partos/{p['id']}", headers=d["h_prod"]).json()
     assert det["alta_extemporanea"] is True and len(det["fotos"]) == 1
 
-    # Corrección aplicada y bitácora ligada a la corrección (RF-19)
-    with engine.connect() as conn:
+    # Corrección aplicada y bitácora ligada a la corrección (RF-19).
+    # correccion tiene RLS: se consulta con la identidad del técnico, igual que el API.
+    with como(d["tecnico_id"]) as conn:
         estado = conn.execute(text("SELECT estado FROM correccion WHERE id = :c"),
                               {"c": p["correccion_id"]}).scalar()
         filas = conn.execute(text("SELECT count(*) FROM bitacora_auditoria WHERE correccion_id = :c"),
@@ -112,7 +115,7 @@ def test_tecnico_de_otra_asociacion_recibe_404(d):  # RN-01
 @bd
 def test_mes_en_curso_da_409(d):
     r = alta(d, cuerpo(madre(d), fecha=hoy_jalisco()))
-    assert r.status_code == 409 and "mes en curso" in r.json()["detail"]
+    assert r.status_code == 409 and r.json()["codigo"] == "MES_EN_CURSO"
 
 
 @bd

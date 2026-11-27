@@ -12,12 +12,19 @@ de la BD (docs/03 §6):
   5) parto + crías con alta_extemporanea = true
   6) fn_finalizar_correccion → corrección 'aplicada' e inmutable (OV007)
 La bitácora registra cada fila con el correccion_id (RF-19).
-La corrección de partos ya guardados (HU-28) vivirá en este mismo archivo.
+
+Foto de evidencia: nace en 'pendiente' y su SHA-256 queda comprometido desde esta
+transacción. Quien solicita y aprueba es el mismo técnico, que ya tiene la foto; los
+bytes se suben después con /fotos/firma (entidad = "correccion", HU-05), que sí permite
+subir las fotos registradas junto con la corrección. El panel marca las altas cuya
+foto siga pendiente (fotos[].estado_subida). En la corrección de partos guardados
+(HU-28) quien aprueba no es quien solicita, por eso ahí se exige la foto 'subida'.
 """
 import json
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.deps import DbUsuario, validar_autoridad
@@ -44,11 +51,15 @@ def _es_mes_en_curso(conn, rancho_id: UUID, fecha) -> bool:
 
 @router.post("/ranchos/{rancho_id}/altas-extemporaneas", response_model=AltaExtemporaneaSalida,
              status_code=status.HTTP_201_CREATED,
+             responses={409: {"description": "MES_EN_CURSO: el parto es del mes en curso; "
+                                             "lo registra el productor"}},
              summary="Dar de alta un parto de un mes cerrado (solo Asociación/Técnico)")
 def alta_extemporanea(rancho_id: UUID, datos: AltaExtemporaneaCrear, conn: DbUsuario):
     validar_autoridad(conn, rancho_id)               # 404 otro rancho · 403 productor (CA-07.4)
     if _es_mes_en_curso(conn, rancho_id, datos.fecha_parto):
-        raise HTTPException(409, MES_ABIERTO)
+        # Mismo formato que los OVxxx y DUPLICADO de app/main.py. Aún no se escribió nada.
+        return JSONResponse(status_code=409,
+                            content={"codigo": "MES_EN_CURSO", "detalle": MES_ABIERTO})
     madre = validar_madre_y_semental(conn, rancho_id, datos)
 
     # 1) Solicitud. datos_propuestos guarda lo que se pidió registrar (sin el motivo).
