@@ -9,7 +9,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import android.net.Uri
 import com.arete.app.ui.screens.animal.AnimalEditorScreen
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
@@ -34,7 +33,7 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
     }
 
     val navController = rememberNavController()
-    val startDestination = remember { if (isLoggedIn) AppRoutes.HOME else AppRoutes.LOGIN }
+    val startDestination = remember { if (isLoggedIn) AppRoutes.INVENTORY else AppRoutes.LOGIN }
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable(AppRoutes.LOGIN) { LoginScreen() }
@@ -48,9 +47,9 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
         }
         composable(AppRoutes.INVENTORY) { entry ->
             val refresh by entry.savedStateHandle.getStateFlow("inventoryRefresh", 0L).collectAsState()
-            InventoryScreen(onHome = { navController.popBackStack(AppRoutes.HOME, false) },
-                onAdd = { navController.navigate("animal-editor") },
-                onOpen = { id -> navController.navigate(AppRoutes.animalDetail(Uri.encode(id))) }, refreshKey = refresh)
+            InventoryScreen(onHome = { navController.navigate(AppRoutes.HOME) { popUpTo(navController.graph.id) { inclusive = true }; launchSingleTop = true } },
+                onAdd = { navController.navigate(AppRoutes.animalEditor()) },
+                onOpen = { id -> navController.navigate(AppRoutes.animalDetail(id)) }, refreshKey = refresh)
         }
         // Ficha del animal (HU-20). La abren el inventario y "Leer arete" (HU-53) por la misma ruta.
         composable(
@@ -59,16 +58,16 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
         ) { entry ->
             val refresh by entry.savedStateHandle.getStateFlow("detailRefresh", 0L).collectAsState()
             AnimalDetailScreen(onBack = { navController.popBackStack() },
-                onHome = { navController.popBackStack(AppRoutes.HOME, false) },
-                onEdit = { id -> navController.navigate("animal-editor?animalId=${Uri.encode(id)}") }, refreshKey = refresh)
+                onHome = { navController.navigate(AppRoutes.HOME) { popUpTo(navController.graph.id) { inclusive = true }; launchSingleTop = true } },
+                onEdit = { id -> navController.navigate(AppRoutes.animalEditor(id)) }, refreshKey = refresh)
         }
-        composable("animal-editor?animalId={animalId}", arguments = listOf(navArgument("animalId") { defaultValue = "" })) {
+        composable(AppRoutes.ANIMAL_EDITOR, arguments = listOf(navArgument("animalId") { defaultValue = "" })) {
             val backLabel = remember {
                 if (navController.previousBackStackEntry?.destination?.route == AppRoutes.ANIMAL_DETAIL)
                     "Volver a la ficha" else "Volver al inventario"
             }
             AnimalEditorScreen(onBack = { navController.popBackStack() }, onSaved = {
-                navController.getBackStackEntry(AppRoutes.INVENTORY).savedStateHandle["inventoryRefresh"] = System.nanoTime()
+                runCatching { navController.getBackStackEntry(AppRoutes.INVENTORY) }.getOrNull()?.savedStateHandle?.set("inventoryRefresh", System.nanoTime())
                 navController.previousBackStackEntry?.savedStateHandle?.set("detailRefresh", System.nanoTime())
                 navController.popBackStack()
             }, backLabel = backLabel)
@@ -85,7 +84,7 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
             currentRoute != AppRoutes.LOGIN
         }
         if (needsRedirect) {
-            val target = if (isLoggedIn) AppRoutes.HOME else AppRoutes.LOGIN
+            val target = if (isLoggedIn) AppRoutes.INVENTORY else AppRoutes.LOGIN
             navController.navigate(target) {
                 popUpTo(navController.graph.id) { inclusive = true }
                 launchSingleTop = true

@@ -6,11 +6,11 @@ import com.arete.app.data.remote.ApiService
 
 object InventoryRepositoryFactory {
     @Suppress("UNUSED_PARAMETER")
-    fun create(context: Context, tokenStorage: TokenStorage, apiService: ApiService): InventoryRepository =
-        RemoteInventoryRepository(apiService)
+    fun create(context: Context, tokenStorage: TokenStorage, apiService: ApiService, authRepository: AuthRepository): InventoryRepository =
+        RemoteInventoryRepository(apiService, authRepository::getRanches)
 }
 
 object AnimalEditorRepositoryFactory {
     @Suppress("UNUSED_PARAMETER")
-    fun create(context: Context, tokenStorage: TokenStorage): AnimalEditorRepository = UnavailableAnimalEditorRepository()
+    fun create(context: Context, tokenStorage: TokenStorage, remote: AnimalEditorRepository): AnimalEditorRepository = remote
 }

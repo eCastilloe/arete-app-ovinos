@@ -3,6 +3,8 @@ package com.arete.app.di
 import android.content.Context
 import com.arete.app.BuildConfig
 import com.arete.app.data.local.TokenStorage
+import com.arete.app.data.remote.AnimalApiService
+import com.arete.app.data.repository.RemoteAnimalEditorRepository
 import com.arete.app.data.remote.ApiService
 import com.arete.app.data.remote.AuthInterceptor
 import okhttp3.OkHttpClient
@@ -18,6 +20,10 @@ import com.arete.app.data.repository.InventoryRepositoryFactory
 import com.arete.app.data.repository.AnimalEditorRepositoryFactory
 import com.arete.app.data.repository.LocalAnimalDetailRepository
 import com.arete.app.data.local.AnimalPhotoStore
+import com.arete.app.alerts.AlertDataSourceFactory
+import com.arete.app.alerts.AlertRunner
+import com.arete.app.alerts.NotificationAlertPresenter
+import com.arete.app.alerts.PreferencesShownAlertStore
 import com.arete.app.reader.LectorArete
 import com.arete.app.reader.SimulatedLectorArete
 
@@ -41,27 +47,45 @@ class AppContainer(context: Context) {
         }
     }
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(AuthInterceptor(tokenStorage))
+    private val publicClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    val apiService: ApiService = Retrofit.Builder()
+    private fun <T> createService(client: OkHttpClient, type: Class<T>,
+        converter: retrofit2.Converter.Factory = GsonConverterFactory.create()): T = Retrofit.Builder()
         .baseUrl(BuildConfig.API_BASE_URL)
-        .client(okHttpClient)
-        .addConverterFactory(GsonConverterFactory.create())
+        .client(client)
+        .addConverterFactory(converter)
         .build()
-        .create(ApiService::class.java)
+        .create(type)
 
-    val authRepository = AuthRepository(apiService, tokenStorage)
+    private val authApi = createService(publicClient, ApiService::class.java)
+    private val authenticatedClient = publicClient.newBuilder()
+        .addInterceptor(AuthInterceptor(tokenStorage, authApi))
+        .build()
+    val apiService = createService(authenticatedClient, ApiService::class.java)
+    val authRepository = AuthRepository(authApi, tokenStorage, authenticatedApi = apiService)
     val syncRepository = SyncRepository(database.pendingOperationDao())
-    val inventoryRepository = InventoryRepositoryFactory.create(context, tokenStorage, apiService)
-    val animalEditorRepository = AnimalEditorRepositoryFactory.create(context, tokenStorage)
-    val animalDetailRepository = LocalAnimalDetailRepository(animalEditorRepository)
+    val inventoryRepository = InventoryRepositoryFactory.create(context, tokenStorage, apiService, authRepository)
     val animalPhotoStore = AnimalPhotoStore(context.applicationContext)
+    val animalApiService = createService(authenticatedClient, AnimalApiService::class.java, AnimalApiService.converterFactory())
+    private val remoteAnimalEditor = RemoteAnimalEditorRepository(animalApiService, {
+        authRepository.validateSession().getOrThrow()
+        authRepository.getRanches()
+    }, animalPhotoStore::find, animalPhotoStore::associate)
+    val animalEditorRepository = AnimalEditorRepositoryFactory.create(context, tokenStorage, remoteAnimalEditor)
+    val animalDetailRepository = LocalAnimalDetailRepository(animalEditorRepository)
     // HU-54 cambia solo esta línea por el lector NFC/QR real.
     val lectorArete: LectorArete = SimulatedLectorArete()
+
+    // HU-39: avisos locales de parto y destete.
+    val alertPresenter = NotificationAlertPresenter(context)
+    val alertRunner = AlertRunner(
+        AlertDataSourceFactory.create(tokenStorage),
+        PreferencesShownAlertStore(context),
+        alertPresenter
+    )
 }

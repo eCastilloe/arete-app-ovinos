@@ -44,13 +44,14 @@ class AnimalFormTest {
     @Test fun parentSelectionExcludesOtherRanchWrongSexSelfDeletedAndExternalButKeepsHistoricalParents() {
         val female = AnimalRecord("mother", "rancho", valid)
         val male = female.copy(id = "father", form = valid.copy(sex = AnimalSex.MALE, category = AnimalCategory.STUD))
-        val existing = female.copy(id = "self")
+        val existing = female.copy(id = "self", form = valid.copy(mother = ParentChoice(ParentKind.LOCAL, "dead")))
         val records = listOf(female, male, existing, female.copy(id = "other", ranchId = "other"),
             female.copy(id = "deleted", isDeleted = true), female.copy(id = "external", isExternal = true),
             female.copy(id = "dead", situation = AnimalSituation.DEAD))
         val data = context.copy(records = records, existing = existing)
         assertEquals(setOf("mother", "dead"), parentCandidates(data, AnimalSex.FEMALE).map { it.id }.toSet())
         assertEquals(listOf("father"), parentCandidates(data, AnimalSex.MALE).map { it.id })
+        assertEquals(listOf("mother", "self"), parentCandidates(data.copy(existing = null), AnimalSex.FEMALE).map { it.id })
         assertTrue(validateAnimalForm(valid.copy(mother = ParentChoice(ParentKind.LOCAL, "father")), data, today).containsKey(AnimalField.MOTHER))
     }
 

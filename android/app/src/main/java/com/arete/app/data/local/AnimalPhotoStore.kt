@@ -1,6 +1,7 @@
 package com.arete.app.data.local
 
 import android.content.Context
+import androidx.core.content.edit
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -68,6 +69,13 @@ class AnimalPhotoStore(private val context: Context) {
             if (oriented !== bitmap) oriented?.recycle()
             bitmap?.recycle()
             temporary.delete()
+        }
+    }
+    private val associations = context.getSharedPreferences("animal_photos", android.content.Context.MODE_PRIVATE)
+    fun find(ranchId: String, animalId: String): String? = associations.getString("$ranchId/$animalId", null)?.takeIf { File(it).isFile }
+    fun associate(ranchId: String, animalId: String, path: String?) {
+        associations.edit {
+            if (path == null) remove("$ranchId/$animalId") else putString("$ranchId/$animalId", path)
         }
     }
 }

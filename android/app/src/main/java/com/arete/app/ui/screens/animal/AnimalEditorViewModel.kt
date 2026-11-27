@@ -47,7 +47,7 @@ class AnimalEditorViewModel(
                 val context = withContext(Dispatchers.IO) { repository.loadEditor(animalId) }
                 val draft = savedState.get<String>("draft")?.let { runCatching { gson.fromJson(it, AnimalForm::class.java) }.getOrNull() }
                 mutableState.value = AnimalEditorState(loading = false, context = context,
-                    form = draft ?: context.existing?.form ?: AnimalForm(), dirty = draft != null,
+                    form = draft ?: context.existing?.form ?: AnimalForm(clientId = java.util.UUID.randomUUID().toString()), dirty = draft != null,
                     step = (savedState.get<Int>("step") ?: 0).coerceIn(0, 2))
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
@@ -112,6 +112,10 @@ class AnimalEditorViewModel(
                 mutableState.value = state.value.copy(saving = false, dirty = false, savedId = result.id)
             } catch (e: CancellationException) { throw e
             } catch (e: AnimalValidationException) { fieldErrors(e.fields)
+            } catch (e: AnimalBirthLockedException) {
+                mutableState.value = state.value.copy(saving = false, error = "Los datos de nacimiento están bloqueados. Solicita la corrección a la Asociación; conservamos lo escrito.")
+            } catch (e: AnimalServerValidationException) {
+                mutableState.value = state.value.copy(saving = false, error = "El servidor rechazó los datos. Revisa la categoría, el sexo y los progenitores; conservamos lo escrito.")
             } catch (e: AnimalEditingDeniedException) {
                 mutableState.value = state.value.copy(saving = false, context = context.copy(canEdit = false),
                     error = "Ya no tienes permiso para editar. No se guardó la ficha.")

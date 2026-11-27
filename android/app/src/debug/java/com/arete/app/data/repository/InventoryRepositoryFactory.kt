@@ -8,21 +8,28 @@ import java.io.File
 
 // This entire source set is excluded from release builds. No real ranch is changed.
 object InventoryRepositoryFactory {
-    fun create(context: Context, tokenStorage: TokenStorage, apiService: ApiService): InventoryRepository {
+    fun create(context: Context, tokenStorage: TokenStorage, apiService: ApiService, authRepository: AuthRepository): InventoryRepository {
         val demo = createDemoAnimals(context, tokenStorage)
-        val remote = RemoteInventoryRepository(apiService)
+        val remote = RemoteInventoryRepository(apiService, authRepository::getRanches)
         return InventoryRepository {
-            if (tokenStorage.getToken() == "demo-token") demo.load() else remote.load()
+            if (tokenStorage.getSession()?.isDemo == true) demo.load() else remote.load()
         }
     }
 }
 
 object AnimalEditorRepositoryFactory {
-    fun create(context: Context, tokenStorage: TokenStorage): AnimalEditorRepository = createDemoAnimals(context, tokenStorage)
+    fun create(context: Context, tokenStorage: TokenStorage, remote: AnimalEditorRepository): AnimalEditorRepository {
+        val demo = createDemoAnimals(context, tokenStorage)
+        return object : AnimalEditorRepository {
+            private suspend fun selected() = if (tokenStorage.getSession()?.isDemo == true) demo else remote
+            override suspend fun loadEditor(animalId: String?) = selected().loadEditor(animalId)
+            override suspend fun save(animalId: String?, form: AnimalForm, expectedVersion: Int?) = selected().save(animalId, form, expectedVersion)
+        }
+    }
 }
 
 private fun createDemoAnimals(context: Context, tokens: TokenStorage) = DemoAnimalRepository(
-    File(context.filesDir, "hu19-demo/animals.json"), isDemoSession = { tokens.getToken() == "demo-token" }
+    File(context.filesDir, "hu19-demo/animals.json"), isDemoSession = { tokens.getSession()?.isDemo == true }
 )
 
 object DemoInventoryData {
