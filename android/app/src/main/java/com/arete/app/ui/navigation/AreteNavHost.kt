@@ -7,6 +7,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.arete.app.ui.screens.animal.AnimalEditorScreen
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -42,12 +45,16 @@ fun AreteNavHost(isLoggedIn: Boolean?) {
                 onInventory = { navController.navigate(AppRoutes.INVENTORY) { launchSingleTop = true } }
             )
         }
-        composable(AppRoutes.INVENTORY) {
-            InventoryScreen(onHome = {
-                navController.navigate(AppRoutes.HOME) {
-                    popUpTo(AppRoutes.INVENTORY) { inclusive = true }
-                    launchSingleTop = true
-                }
+        composable(AppRoutes.INVENTORY) { entry ->
+            val refresh by entry.savedStateHandle.getStateFlow("inventoryRefresh", 0L).collectAsState()
+            InventoryScreen(onHome = { navController.navigate(AppRoutes.HOME) { popUpTo(AppRoutes.INVENTORY) { inclusive = true }; launchSingleTop = true } },
+                onAdd = { navController.navigate(AppRoutes.animalEditor()) },
+                onEdit = { id -> navController.navigate(AppRoutes.animalEditor(id)) }, refreshKey = refresh)
+        }
+        composable(AppRoutes.ANIMAL_EDITOR, arguments = listOf(navArgument("animalId") { defaultValue = "" })) {
+            AnimalEditorScreen(onBack = { navController.popBackStack() }, onSaved = {
+                navController.previousBackStackEntry?.savedStateHandle?.set("inventoryRefresh", System.nanoTime())
+                navController.popBackStack()
             })
         }
         composable(

@@ -59,3 +59,18 @@ def validar_productor(conn, rancho_id: UUID):
     """), {"r": rancho_id}).scalar()
     if not es_productor:
         raise HTTPException(403, "Solo el productor del rancho puede administrar a su equipo")
+
+
+def validar_autoridad(conn, rancho_id: UUID):
+    """Solo admin o técnico de la Asociación del rancho corrigen partos o dan de alta
+    partos atrasados (RF-07, RN-05). Misma regla que fn_es_autoridad en la BD.
+
+    404 si no tiene acceso al rancho; 403 si tiene acceso pero no es autoridad (CA-07.4).
+    Lo reutiliza la corrección auditada (HU-28).
+    """
+    validar_rancho(conn, rancho_id)
+    es_autoridad = conn.execute(text("SELECT fn_es_autoridad(fn_usuario_actual(), :r)"),
+                                {"r": rancho_id}).scalar()
+    if not es_autoridad:
+        raise HTTPException(403, "Solo la Asociación o el Técnico pueden corregir partos "
+                                 "o dar de alta partos atrasados")

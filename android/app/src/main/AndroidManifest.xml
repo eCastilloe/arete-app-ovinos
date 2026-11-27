@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- HU-39: avisos locales de parto y destete (Android 13+ lo pide al usuario). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".AreteApplication"
@@ -15,6 +17,13 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Arete">
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.animalphotos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/animal_photo_paths" />
+        </provider>
         <activity
             android:name=".MainActivity"
             android:exported="true"

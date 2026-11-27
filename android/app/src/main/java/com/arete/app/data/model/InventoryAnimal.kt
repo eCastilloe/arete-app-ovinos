@@ -39,5 +39,6 @@ data class InventorySnapshot(
     val ranchId: String,
     val ranchName: String,
     val animals: List<InventoryAnimal>,
-    val isDemo: Boolean = false
+    val isDemo: Boolean = false,
+    val canEdit: Boolean = false
 )
