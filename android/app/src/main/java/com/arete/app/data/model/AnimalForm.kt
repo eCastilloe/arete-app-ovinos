@@ -8,8 +8,8 @@ val AnimalBreeds = listOf("Dorper", "Pelifolk", "Pelibuey", "Katahdin", "Blackbe
 val BirthDateFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT)
 fun parseBirthDate(text: String): LocalDate? = runCatching { LocalDate.parse(text.trim(), BirthDateFormat) }.getOrNull()
 
-enum class EntryReason(val label: String) {
-    BIRTH("Nacimiento"), PURCHASE("Compra"), RETURN("Reingreso"), TRANSFER("Transferencia")
+enum class EntryReason(val label: String, val code: String) {
+    INITIAL_REGISTRATION("Registro inicial", "registro_inicial"), PURCHASE("Compra", "compra"), RETURN("Reingreso", "reingreso"), TRANSFER("Transferencia", "transferencia")
 }
 enum class ParentKind { UNKNOWN, EXTERNAL, LOCAL }
 data class ParentChoice(val kind: ParentKind = ParentKind.UNKNOWN, val id: String? = null, val reference: String = "")
@@ -22,14 +22,13 @@ data class AnimalForm(
     val birthType: String = "", val conception: String = "",
     val reproductiveState: String = "", val destination: String = "",
     val registration: String = "", val dna: String = "", val breeder: String = "", val owner: String = "",
-    val photoPath: String? = null, val notes: String = ""
+    val photoPath: String? = null, val notes: String = "", val clientId: String? = null
 ) {
     fun normalized() = copy(folio = folio.trim(), siniiga = siniiga.trim(), color = color.trim(),
         birthDate = birthDate.trim(), registration = registration.trim(), dna = dna.trim(),
         breeder = breeder.trim(), owner = owner.trim(), notes = notes.trim(),
         mother = mother.copy(reference = mother.reference.trim()), father = father.copy(reference = father.reference.trim()),
-        reproductiveState = if (sex == AnimalSex.FEMALE) reproductiveState else "",
-        destination = if (sex == AnimalSex.MALE) destination else "")
+        reproductiveState = if (sex == AnimalSex.FEMALE) reproductiveState else "")
 }
 
 enum class AnimalField(val step: Int) {
@@ -51,11 +50,14 @@ data class AnimalRecord(
 data class AnimalEditorContext(
     val ranchId: String, val ranchName: String, val canEdit: Boolean,
     val records: List<AnimalRecord>, val existing: AnimalRecord? = null,
-    val breeds: List<String> = AnimalBreeds, val isDemo: Boolean = false
+    val breeds: List<String> = AnimalBreeds, val isDemo: Boolean = false,
+    val breedIds: Map<String, Int> = emptyMap()
 )
 
 fun parentCandidates(context: AnimalEditorContext, sex: AnimalSex): List<AnimalRecord> = context.records.filter {
-    it.ranchId == context.ranchId && it.form.sex == sex && it.id != context.existing?.id && !it.isDeleted && !it.isExternal
+    val savedParent = if (sex == AnimalSex.FEMALE) context.existing?.form?.mother else context.existing?.form?.father
+    it.ranchId == context.ranchId && it.form.sex == sex && it.id != context.existing?.id && !it.isDeleted && !it.isExternal &&
+        (it.situation == AnimalSituation.ACTIVE || it.id == savedParent?.id)
 }.sortedBy { it.form.folio }
 
 fun validateAnimalForm(form: AnimalForm, context: AnimalEditorContext, today: LocalDate): Map<AnimalField, String> = buildMap {
@@ -64,7 +66,7 @@ fun validateAnimalForm(form: AnimalForm, context: AnimalEditorContext, today: Lo
         put(AnimalField.SINIIGA, "Debe empezar con 484 y tener entre 10 y 15 dígitos.")
     if (form.breed !in context.breeds) put(AnimalField.BREED, "Selecciona una raza del catálogo.")
     if (form.color.isBlank()) put(AnimalField.COLOR, "Escribe el color del animal.")
-    if (form.reason == null) put(AnimalField.REASON, "Selecciona el motivo de ingreso.")
+    if (form.reason == null && context.existing == null) put(AnimalField.REASON, "Selecciona el motivo de ingreso.")
     val date = parseBirthDate(form.birthDate)
     if (date == null || date > today) put(AnimalField.BIRTH_DATE, "Usa una fecha válida (dd/mm/aaaa), que no sea futura.")
     if ((form.category in listOf(AnimalCategory.EWE, AnimalCategory.REPLACEMENT) && form.sex != AnimalSex.FEMALE) ||
@@ -73,7 +75,7 @@ fun validateAnimalForm(form: AnimalForm, context: AnimalEditorContext, today: Lo
     listOf(Triple(form.mother, AnimalSex.FEMALE, AnimalField.MOTHER), Triple(form.father, AnimalSex.MALE, AnimalField.FATHER)).forEach { (choice, sex, field) ->
         when (choice.kind) {
             ParentKind.UNKNOWN -> Unit
-            ParentKind.EXTERNAL -> if (choice.reference.isBlank()) put(field, "Escribe una referencia del progenitor externo.")
+            ParentKind.EXTERNAL -> if (choice.reference.isBlank() || choice.reference.length > 30) put(field, "Escribe una referencia externa de 1 a 30 caracteres.")
             ParentKind.LOCAL -> {
                 val parent = parentCandidates(context, sex).find { it.id == choice.id }
                 val parentDate = parent?.form?.birthDate?.let(::parseBirthDate)

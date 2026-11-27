@@ -138,7 +138,7 @@ internal fun AnimalEditorContent(
                                 }
                             }
                             1 -> {
-                                ChoiceField("Motivo de ingreso *", AnimalField.REASON, form.reason?.label.orEmpty(), EntryReason.entries.map { it.label }, state, editable, finishTyping) { value ->
+                                ChoiceField("Motivo de ingreso *", AnimalField.REASON, form.reason?.label ?: if (context.existing != null) "Registrado en el servidor" else "", EntryReason.entries.map { it.label }, state, editable && context.existing == null, finishTyping) { value ->
                                     onChange(AnimalField.REASON) { it.copy(reason = EntryReason.entries.first { reason -> reason.label == value }) }
                                 }
                                 FormInput("Nacimiento * (dd/mm/aaaa)", AnimalField.BIRTH_DATE, form.birthDate, state, editable && !locked, finishTyping, KeyboardType.Text) { value -> onChange(AnimalField.BIRTH_DATE) { it.copy(birthDate = value) } }
@@ -154,13 +154,14 @@ internal fun AnimalEditorContent(
                             2 -> {
                                 if (form.sex == AnimalSex.FEMALE) ChoiceField("Estado reproductivo", AnimalField.REPRODUCTIVE_STATE, form.reproductiveState,
                                     listOf("", "Vacía", "En empadre", "Gestante", "Lactancia"), state, editable, finishTyping) { value -> onChange(AnimalField.REPRODUCTIVE_STATE) { it.copy(reproductiveState = value) } }
-                                else ChoiceField("Destino", AnimalField.DESTINATION, form.destination,
+                                ChoiceField("Destino", AnimalField.DESTINATION, form.destination,
                                     listOf("", "Pie de cría", "Engorda", "Rastro", "Reemplazo", "Venta"), state, editable, finishTyping) { value -> onChange(AnimalField.DESTINATION) { it.copy(destination = value) } }
                                 FormInput("Registro UNO", AnimalField.REGISTRATION, form.registration, state, editable, finishTyping) { value -> onChange(AnimalField.REGISTRATION) { it.copy(registration = value) } }
                                 FormInput("ADN", AnimalField.DNA, form.dna, state, editable, finishTyping) { value -> onChange(AnimalField.DNA) { it.copy(dna = value) } }
                                 FormInput("Criador", AnimalField.BREEDER, form.breeder, state, editable, finishTyping) { value -> onChange(AnimalField.BREEDER) { it.copy(breeder = value) } }
                                 FormInput("Propietario actual", AnimalField.OWNER, form.owner, state, editable, finishTyping) { value -> onChange(AnimalField.OWNER) { it.copy(owner = value) } }
                                 Text("Foto (opcional)", style = MaterialTheme.typography.titleMedium)
+                                Text("La foto se conserva en este celular. Su sincronización está pendiente.", style = MaterialTheme.typography.bodyMedium)
                                 form.photoPath?.let { path ->
                                     val photo by produceState<android.graphics.Bitmap?>(null, path) {
                                         value = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path) }

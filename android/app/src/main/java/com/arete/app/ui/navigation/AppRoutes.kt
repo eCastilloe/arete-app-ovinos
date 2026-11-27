@@ -8,5 +8,8 @@ object AppRoutes {
     const val ARG_ANIMAL_ID = "animalId"
     const val ANIMAL_DETAIL = "animal/{$ARG_ANIMAL_ID}"
 
+    const val ANIMAL_EDITOR = "animal-editor?animalId={animalId}"
+    fun animalEditor(animalId: String = ""): String = "animal-editor?animalId=${android.net.Uri.encode(animalId)}"
+
     fun animalDetail(animalId: String): String = "animal/$animalId"
 }

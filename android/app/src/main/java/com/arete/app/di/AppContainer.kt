@@ -3,6 +3,8 @@ package com.arete.app.di
 import android.content.Context
 import com.arete.app.BuildConfig
 import com.arete.app.data.local.TokenStorage
+import com.arete.app.data.remote.AnimalApiService
+import com.arete.app.data.repository.RemoteAnimalEditorRepository
 import com.arete.app.data.remote.ApiService
 import com.arete.app.data.remote.AuthInterceptor
 import okhttp3.OkHttpClient
@@ -51,23 +53,29 @@ class AppContainer(context: Context) {
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    private fun createApi(client: OkHttpClient): ApiService = Retrofit.Builder()
+    private fun <T> createService(client: OkHttpClient, type: Class<T>,
+        converter: retrofit2.Converter.Factory = GsonConverterFactory.create()): T = Retrofit.Builder()
         .baseUrl(BuildConfig.API_BASE_URL)
         .client(client)
-        .addConverterFactory(GsonConverterFactory.create())
+        .addConverterFactory(converter)
         .build()
-        .create(ApiService::class.java)
+        .create(type)
 
-    private val authApi = createApi(publicClient)
+    private val authApi = createService(publicClient, ApiService::class.java)
     private val authenticatedClient = publicClient.newBuilder()
         .addInterceptor(AuthInterceptor(tokenStorage, authApi))
         .build()
-    val apiService = createApi(authenticatedClient)
+    val apiService = createService(authenticatedClient, ApiService::class.java)
     val authRepository = AuthRepository(authApi, tokenStorage, authenticatedApi = apiService)
     val syncRepository = SyncRepository(database.pendingOperationDao())
     val inventoryRepository = InventoryRepositoryFactory.create(context, tokenStorage, apiService, authRepository)
-    val animalEditorRepository = AnimalEditorRepositoryFactory.create(context, tokenStorage)
     val animalPhotoStore = AnimalPhotoStore(context.applicationContext)
+    val animalApiService = createService(authenticatedClient, AnimalApiService::class.java, AnimalApiService.converterFactory())
+    private val remoteAnimalEditor = RemoteAnimalEditorRepository(animalApiService, {
+        authRepository.validateSession().getOrThrow()
+        authRepository.getRanches()
+    }, animalPhotoStore::find, animalPhotoStore::associate)
+    val animalEditorRepository = AnimalEditorRepositoryFactory.create(context, tokenStorage, remoteAnimalEditor)
     // HU-54 cambia solo esta línea por el lector NFC/QR real.
     val lectorArete: LectorArete = SimulatedLectorArete()
 
